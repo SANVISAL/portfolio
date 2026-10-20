@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>San Visal · Backend Engineer</title>
+  <meta name="description" content="San Visal, backend engineer building reliable APIs, data pipelines, and distributed systems.">
+  <meta name="theme-color" content="#0a0a12">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a12'/%3E%3Cpath d='M8 10l6 6-6 6' stroke='%2300f0ff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 22h8' stroke='%23ff2bd6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#top"><span class="c-green">visal@prod</span>:<span class="c-cyan">~</span>$</a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#about">/about</a>
+        <a href="#projects">/projects</a>
+        <a href="#stack">/stack</a>
+        <a href="#log">/log</a>
+        <a href="#contact">/contact</a>
+      </nav>
+      <span class="sys-status"><span class="dot ok"></span>all systems operational</span>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">// <span data-bind="role"></span></p>
+        <h1><span data-bind="name"></span><span class="cursor" aria-hidden="true">_</span></h1>
+        <p class="tagline"><span class="c-magenta">&gt;</span> <span id="tagline"></span><span class="caret" aria-hidden="true"></span></p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#projects"><span class="m-get">GET</span> /projects</a>
+          <a class="btn" href="#contact"><span class="m-post">POST</span> /contact</a>
+        </div>
+      </div>
+
+      <div class="terminal" id="terminal">
+        <div class="term-bar">
+          <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <p>visal@prod: ~ (zsh)</p>
+        </div>
+        <div class="term-body" id="term-body" role="log" aria-live="polite"></div>
+        <form class="term-input" id="term-form" autocomplete="off">
+          <label for="term-in" class="t-prompt">visal@prod:~$</label>
+          <input id="term-in" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="Terminal command">
+        </form>
+        <div class="term-chips" id="term-chips" aria-label="Suggested commands"></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section wrap" id="about">
+      <div class="endpoint">
+        <span class="method get">GET</span><h2>/about</h2><span class="desc">Who I am and what I work on</span>
+      </div>
+      <div class="about-grid">
+        <div class="about-bio" id="about-bio"></div>
+        <div class="response">
+          <div class="response-bar"><span class="code ok">200 OK</span><span class="c-dim">application/json · 12ms</span></div>
+          <pre class="json" id="about-json"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROJECTS -->
+    <section class="section wrap" id="projects">
+      <div class="endpoint">
+        <span class="method get">GET</span><h2>/projects</h2><span class="desc">Services I've designed, built, and kept running</span>
+      </div>
+      <div class="services" id="services"></div>
+    </section>
+
+    <!-- STACK -->
+    <section class="section wrap" id="stack">
+      <div class="endpoint">
+        <span class="method get">GET</span><h2>/stack</h2><span class="desc">Tools I use in production</span>
+      </div>
+      <div class="panels" id="panels"></div>
+    </section>
+
+    <!-- EXPERIENCE -->
+    <section class="section wrap" id="log">
+      <div class="endpoint">
+        <span class="method get">GET</span><h2>/log</h2><span class="desc">$ git log --career</span>
+      </div>
+      <ol class="gitlog" id="gitlog"></ol>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="section wrap" id="contact">
+      <div class="endpoint">
+        <span class="method post">POST</span><h2>/contact</h2><span class="desc">Send me a request. I usually respond within 48h.</span>
+      </div>
+      <div class="contact-grid">
+        <form class="request" id="contact-form" novalidate>
+          <div class="response-bar"><span class="c-yellow">POST</span><span class="c-dim">https://visal.dev/api/contact</span></div>
+          <div class="req-body">
+            <span class="c-dim">{</span>
+            <label class="field"><span><span class="j-key">"name"</span>:</span>
+              <input name="name" required placeholder="&quot;Ada Lovelace&quot;" autocomplete="name">
+            </label>
+            <label class="field"><span><span class="j-key">"email"</span>:</span>
+              <input name="email" type="email" required placeholder="&quot;ada@example.com&quot;" autocomplete="email">
+            </label>
+            <label class="field field-msg"><span><span class="j-key">"message"</span>:</span>
+              <textarea name="message" rows="4" required placeholder="&quot;Let's build something reliable.&quot;"></textarea>
+            </label>
+            <span class="c-dim">}</span>
+          </div>
+          <div class="req-actions">
+            <button class="btn primary" type="submit">Send request ⏎</button>
+            <span class="c-dim small">Opens your email app with the message filled in.</span>
+          </div>
+        </form>
+
+        <div class="response" id="contact-response">
+          <div class="response-bar"><span class="code idle" id="contact-code">awaiting request…</span></div>
+          <pre class="json" id="contact-json"></pre>
+          <ul class="links" id="contact-links"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer wrap">
+    <span><span class="dot ok"></span> page served in <span class="c-cyan" id="served">--</span>ms</span>
+    <span class="c-dim">© <span id="year"></span> <span data-bind="name"></span> · try <code>sudo hire me</code></span>
+  </footer>
+
+  <!-- live log stream -->
+  <aside class="logstream" id="logstream" aria-label="Live service logs">
+    <button class="log-head" id="log-toggle" aria-expanded="true">
+      <span><span class="dot ok pulse"></span> tail -f /var/log/visal.log</span><span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <ol id="log-lines"></ol>
+  </aside>
+
+  <!-- easter egg -->
+  <div class="granted" id="granted" hidden role="dialog" aria-modal="true" aria-labelledby="granted-title">
+    <div class="granted-box">
+      <p class="c-dim">[sudo] password for recruiter: ••••••••</p>
+      <h2 id="granted-title">ACCESS GRANTED</h2>
+      <p>Excellent decision. Let's talk about the role.</p>
+      <div class="hero-cta center">
+        <a class="btn primary" id="granted-mail" href="#">Email me</a>
+        <button class="btn" id="granted-close" type="button">Close (Esc)</button>
+      </div>
+    </div>
+  </div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
