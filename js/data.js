@@ -62,6 +62,45 @@ window.PORTFOLIO = {
       ],
       links: { repo: "https://github.com/SANVISAL/HatKaJob", demo: "" },
     },
+    {
+      id: "asset-manager",
+      name: "asset-manager",
+      version: "main",
+      status: "running",
+      summary:
+        "Google Sheets add-on that tracks company devices (laptops, phones, monitors) and who is holding them, with a live dashboard.",
+      problem:
+        "Devices were tracked in a spreadsheet with two lists, assets and staff, that drifted out of sync. Nobody could quickly see who held what, what was free, or what had been handed around before, and every change had to be edited in two places by hand.",
+      architecture: [
+        "Browser",
+        "Dashboard",
+        "Asset Manager",
+        "Google Sheets",
+        "History",
+      ],
+      stack: [
+        "JavaScript",
+        "Google Apps Script",
+        "Google Sheets",
+        "HTML / CSS",
+        "Chart.js",
+        "clasp",
+      ],
+      metrics: [
+        { label: "platform", value: "Apps Script" },
+        { label: "statuses", value: "6" },
+        { label: "deploy", value: "clasp" },
+      ],
+      results: [
+        "Dashboard inside the sheet or as a full-screen web app: KPIs and charts by type, department and condition, plus search, staff view and light/dark theme",
+        "Assign, return and change status from the dashboard; devices move between the USING and stock areas of the sheet automatically",
+        "Two-way sync: typing an asset ID in the Staffs sheet assigns the device, and the asset list rewrites the staff ID columns and checkboxes",
+        "Every assign / return / status change is written to a History sheet with who did it, and each device keeps its full list of previous holders",
+        "Alerts for free devices, pending checks, repairs, unknown holders, status conflicts, old devices and missing info",
+        "Web app runs as the accessing user, so only people with access to the sheet can see the data; code is pushed and versioned with clasp",
+      ],
+      links: { repo: "https://github.com/SANVISAL/Asset_Management", demo: "" },
+    },
   ],
 
   stack: [
