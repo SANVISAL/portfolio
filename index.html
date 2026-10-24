@@ -11,9 +11,23 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <script>document.documentElement.classList.add("js")</script>
+  <script>
+    (function (root) {
+      root.classList.add("js");
+      try {
+        if (!sessionStorage.getItem("booted") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          root.classList.add("boot-on");
+          setTimeout(function () { root.classList.remove("boot-on"); }, 5000); // never leave the overlay stuck
+        }
+      } catch (e) {}
+    })(document.documentElement);
+  </script>
 </head>
 <body>
+  <div class="boot" id="boot" aria-hidden="true">
+    <pre id="boot-log"></pre>
+    <p class="boot-skip">press any key to skip</p>
+  </div>
   <div class="bg-grid" aria-hidden="true"></div>
   <div class="scanlines" aria-hidden="true"></div>
 
@@ -24,9 +38,11 @@
         <a href="#about">/about</a>
         <a href="#projects">/projects</a>
         <a href="#stack">/stack</a>
+        <a href="#github">/github</a>
         <a href="#log">/log</a>
         <a href="#contact">/contact</a>
       </nav>
+      <button class="kbd-hint" id="palette-open" type="button" aria-label="Open command palette"><kbd id="kbd-mod">Ctrl</kbd><kbd>K</kbd></button>
       <span class="sys-status"><span class="dot ok"></span>all systems operational</span>
     </div>
     <div class="progress" id="progress" aria-hidden="true"></div>
@@ -35,6 +51,7 @@
   <main id="top">
     <!-- HERO -->
     <section class="hero wrap">
+      <canvas class="net" id="net" aria-hidden="true"></canvas>
       <div class="hero-copy">
         <p class="eyebrow">// <span data-bind="role"></span></p>
         <h1><span data-bind="name" class="glitch" id="hero-name"></span><span class="cursor" aria-hidden="true">_</span></h1>
@@ -42,6 +59,7 @@
         <div class="hero-cta">
           <a class="btn primary" href="#projects"><span class="m-get">GET</span> /projects</a>
           <a class="btn" href="#contact"><span class="m-post">POST</span> /contact</a>
+          <a class="btn" id="cv-btn" href="#" download hidden><span class="m-get">GET</span> /resume.pdf</a>
         </div>
         <dl class="hero-stats" id="hero-stats"></dl>
       </div>
@@ -88,6 +106,14 @@
         <span class="method get">GET</span><h2>/stack</h2><span class="desc">Tools I use in production</span>
       </div>
       <div class="panels" id="panels"></div>
+    </section>
+
+    <!-- GITHUB -->
+    <section class="section wrap" id="github">
+      <div class="endpoint">
+        <span class="method get">GET</span><h2>/github</h2><span class="desc">Live from api.github.com</span>
+      </div>
+      <div class="gh" id="gh"><p class="c-dim">$ curl api.github.com … connecting</p></div>
     </section>
 
     <!-- EXPERIENCE -->
@@ -146,6 +172,19 @@
     </button>
     <ol id="log-lines"></ol>
   </aside>
+
+  <!-- command palette -->
+  <div class="palette" id="palette" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette-box">
+      <label class="palette-input"><span class="t-prompt">&#10095;</span>
+        <input id="palette-in" type="text" placeholder="Type a command or search…" autocomplete="off" spellcheck="false"
+               role="combobox" aria-controls="palette-list" aria-expanded="true">
+      </label>
+      <ul id="palette-list" role="listbox"></ul>
+      <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <!-- easter egg -->
   <div class="granted" id="granted" hidden role="dialog" aria-modal="true" aria-labelledby="granted-title">

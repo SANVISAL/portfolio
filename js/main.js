@@ -26,6 +26,43 @@
   const mailto = (subject = "", body = "") =>
     `mailto:${D.contact.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
+  /* ---------- boot intro (once per session; decided in <head>) ---------- */
+  const booted = (async () => {
+    const root = document.documentElement;
+    if (!root.classList.contains("boot-on")) return;
+    try { sessionStorage.setItem("booted", "1"); } catch (e) {}
+    const log = $("#boot-log");
+    let skip = false;
+    const onSkip = () => (skip = true);
+    addEventListener("keydown", onSkip);
+    addEventListener("pointerdown", onSkip);
+    const dots = (label, w = 34) => esc(label) + " " + ".".repeat(Math.max(2, w - label.length)) + " ";
+    const OK = `<span class="c-green">[  OK  ]</span>`;
+    const lines = [
+      `<span class="c-cyan">VISAL-BIOS</span> v${new Date().getFullYear()} · ${esc(D.location)}`,
+      `<span class="c-dim">(c) ${esc(D.name)}. All rights reserved.</span>`,
+      "",
+      dots("memory check") + `<span class="c-green">OK</span>`,
+      dots("mounting /projects") + `<span class="c-yellow">${D.projects.length} found</span>`,
+      ...D.projects.map((p) => `${OK} started <span class="c-white">${esc(p.name)}.service</span>`),
+      `${OK} started api-gateway.service`,
+      `${OK} reached target <span class="c-magenta">portfolio</span>`,
+      "",
+      `${esc(D.handle)}@prod login: <span class="c-cyan">guest</span>`,
+    ];
+    for (const line of lines) {
+      if (skip) break;
+      log.innerHTML += line + "\n";
+      await sleep(line ? rand(70, 150) : 60);
+    }
+    if (!skip) await sleep(350);
+    removeEventListener("keydown", onSkip);
+    removeEventListener("pointerdown", onSkip);
+    $("#boot").classList.add("done");
+    await sleep(450);
+    root.classList.remove("boot-on");
+  })();
+
   /* ---------- static bindings ---------- */
   document.querySelectorAll("[data-bind]").forEach((el) => (el.textContent = D[el.dataset.bind]));
   $("#year").textContent = new Date().getFullYear();
@@ -52,6 +89,7 @@
   if (!reduceMotion) {
     document.querySelectorAll("#hero-stats dd").forEach(async (dd) => {
       const n = +dd.dataset.n;
+      await booted;
       for (let i = 0; i <= n; i++) {
         dd.textContent = i + dd.dataset.unit;
         await sleep(900 / Math.max(n, 1));
@@ -63,6 +101,7 @@
   (async () => {
     const el = $("#tagline");
     if (reduceMotion) return (el.textContent = D.tagline);
+    await booted;
     await sleep(400);
     for (const ch of D.tagline) {
       el.textContent += ch;
@@ -119,7 +158,7 @@
         <div class="case" id="cs-${esc(p.id)}" hidden>
           <div><h4>// problem</h4><p>${esc(p.problem)}</p></div>
           <div><h4>// result</h4><ul class="results">${p.results.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>
-          <div class="arch-wrap"><h4>// architecture</h4><div class="arch">${archHTML(p)}</div></div>
+          <div class="arch-wrap"><h4>// architecture</h4><div class="arch">${archHTML(p)}</div><div class="arch-trace" aria-hidden="true"></div></div>
           ${links ? `<div class="case-links">${links}</div>` : ""}
         </div>
       </article>`;
@@ -133,6 +172,35 @@
     btn.textContent = open ? "$ close case-study.md" : "$ cat case-study.md";
     $(".case", card).hidden = !open;
     card.classList.toggle("open", open);
+    card.classList.remove("tilting");
+    card.style.transform = "";
+    if (open) trace(card);
+  }
+
+  // Light up the architecture diagram hop by hop, like a request moving through the services.
+  const tracing = new WeakSet();
+  async function trace(card) {
+    if (reduceMotion || tracing.has(card)) return;
+    tracing.add(card);
+    const nodes = [...card.querySelectorAll(".arch .node")];
+    const wires = [...card.querySelectorAll(".arch .wire")];
+    const label = $(".arch-trace", card);
+    const reset = () => card.querySelectorAll(".arch .hit").forEach((el) => el.classList.remove("hit"));
+    while (card.classList.contains("open")) {
+      for (let i = 0; i < nodes.length && card.classList.contains("open"); i++) {
+        if (i) wires[i - 1].classList.add("hit");
+        nodes[i].classList.add("hit");
+        label.innerHTML = `<span class="c-dim">trace</span> hop ${i + 1}/${nodes.length} → <span class="c-cyan">${esc(nodes[i].textContent)}</span>`;
+        await sleep(550);
+      }
+      label.innerHTML += ` <span class="c-green">· 200 OK</span>`;
+      await sleep(1500);
+      reset();
+      await sleep(350);
+    }
+    reset();
+    label.textContent = "";
+    tracing.delete(card);
   }
   $("#services").addEventListener("click", (e) => {
     const btn = e.target.closest(".svc-toggle");
@@ -366,6 +434,7 @@
   (async () => {
     const last = new Date(Date.now() - rand(2, 40) * 3600e3);
     print(`<span class="t-dim">Last login: ${last.toDateString()} ${last.toTimeString().slice(0, 8)} on ttys001</span>`);
+    await booted;
     await sleep(reduceMotion ? 0 : 700);
     await autoType("whoami");
     print(`\n<span class="t-dim">Type a command (try</span> <span class="t-key">help</span><span class="t-dim">) or tap one below.</span>`);
@@ -467,13 +536,14 @@
 
   /* ---------- scroll effects ---------- */
   const revealTargets = [
-    ".endpoint", ".about-bio", "#about .response", ".service", ".panel", ".commit", ".request", "#contact-response",
+    ".endpoint", ".about-bio", "#about .response", ".service", ".panel", "#gh", ".commit", ".request", "#contact-response",
   ];
   const revealer = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
       if (!e.isIntersecting) return;
       e.target.classList.add("in");
       revealer.unobserve(e.target);
+      setTimeout(() => e.target.style.setProperty("--rd", "0s"), 1200);
     });
   }, { rootMargin: "0px 0px -8% 0px" });
   document.querySelectorAll(revealTargets.join(",")).forEach((el) => {
@@ -512,6 +582,326 @@
       ticking = false;
     });
   }, { passive: true });
+
+  /* ---------- hero network canvas ---------- */
+  (() => {
+    const c = $("#net");
+    const ctx = c.getContext("2d");
+    const hero = $(".hero");
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const LINK = 150, MOUSE = 190;
+    let W = 0, H = 0, nodes = [], packets = [], mouse = null, visible = true, raf = 0, lastSpawn = 0;
+
+    function size() {
+      W = c.clientWidth; H = c.clientHeight;
+      c.width = W * dpr; c.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.min(90, Math.round((W * H) / 15000));
+      nodes = Array.from({ length: n }, () => ({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35,
+        r: Math.random() * 1.2 + 1,
+      }));
+      packets = [];
+    }
+
+    function spawnPacket() {
+      const a = pick(nodes);
+      let best = null, bd = LINK;
+      for (const b of nodes) {
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (b !== a && d < bd && Math.random() < 0.6) { best = b; bd = d; }
+      }
+      if (best) packets.push({ a, b: best, t: 0, c: Math.random() < 0.7 ? "0, 240, 255" : "255, 43, 214" });
+    }
+
+    function draw(now = 0, still = false) {
+      ctx.clearRect(0, 0, W, H);
+      for (const n of nodes) {
+        if (!still) {
+          if (mouse) {
+            const dx = mouse.x - n.x, dy = mouse.y - n.y, d = Math.hypot(dx, dy);
+            if (d < MOUSE && d > 1) { n.vx += (dx / d) * 0.012; n.vy += (dy / d) * 0.012; }
+          }
+          n.vx = Math.max(-0.6, Math.min(0.6, n.vx * 0.995));
+          n.vy = Math.max(-0.6, Math.min(0.6, n.vy * 0.995));
+          n.x += n.vx; n.y += n.vy;
+          if (n.x < 0 || n.x > W) n.vx *= -1;
+          if (n.y < 0 || n.y > H) n.vy *= -1;
+        }
+      }
+      ctx.lineWidth = 1;
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < LINK) {
+            ctx.strokeStyle = `rgba(0, 240, 255, ${(1 - d / LINK) * 0.22})`;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          }
+        }
+        if (mouse) {
+          const d = Math.hypot(a.x - mouse.x, a.y - mouse.y);
+          if (d < MOUSE) {
+            ctx.strokeStyle = `rgba(255, 43, 214, ${(1 - d / MOUSE) * 0.45})`;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+          }
+        }
+        ctx.fillStyle = "rgba(160, 250, 255, .75)";
+        ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2); ctx.fill();
+      }
+      if (still) return;
+      if (now - lastSpawn > 260) { spawnPacket(); lastSpawn = now; }
+      ctx.shadowBlur = 12;
+      packets = packets.filter((p) => (p.t += 0.018) < 1);
+      for (const p of packets) {
+        const x = p.a.x + (p.b.x - p.a.x) * p.t, y = p.a.y + (p.b.y - p.a.y) * p.t;
+        ctx.shadowColor = ctx.fillStyle = `rgba(${p.c}, 1)`;
+        ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    function loop(now) {
+      raf = 0;
+      if (!visible || document.hidden) return;
+      draw(now);
+      raf = requestAnimationFrame(loop);
+    }
+    const start = () => { if (!raf && !reduceMotion) raf = requestAnimationFrame(loop); };
+
+    size();
+    if (reduceMotion) draw(0, true);
+    new ResizeObserver(() => { size(); if (reduceMotion) draw(0, true); }).observe(hero);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(c);
+    document.addEventListener("visibilitychange", start);
+    addEventListener("pointermove", (e) => {
+      const r = c.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      mouse = y >= 0 && y <= r.height ? { x, y } : null;
+    }, { passive: true });
+    document.addEventListener("pointerleave", () => (mouse = null));
+    start();
+  })();
+
+  /* ---------- 3D tilt on project cards ---------- */
+  if (!reduceMotion && matchMedia("(hover: hover)").matches) {
+    $("#services").addEventListener("pointermove", (e) => {
+      const card = e.target.closest(".service");
+      if (!card || card.classList.contains("open")) return;
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      card.classList.add("tilting");
+      card.style.transform = `perspective(900px) rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 9).toFixed(2)}deg) translateY(-4px)`;
+    });
+    $("#services").addEventListener("pointerout", (e) => {
+      const card = e.target.closest(".service");
+      if (card && !card.contains(e.relatedTarget)) {
+        card.classList.remove("tilting");
+        card.style.transform = "";
+      }
+    });
+  }
+
+  /* ---------- resume button ---------- */
+  const cv = $("#cv-btn");
+  if (D.contact.resume) {
+    cv.href = D.contact.resume;
+    if (location.protocol === "file:") cv.hidden = false;
+    else fetch(D.contact.resume, { method: "HEAD" }).then((r) => (cv.hidden = !r.ok)).catch(() => {});
+  }
+
+  /* ---------- toast ---------- */
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  /* ---------- command palette (Ctrl/⌘ + K) ---------- */
+  const pal = $("#palette");
+  const palIn = $("#palette-in");
+  const palList = $("#palette-list");
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+  $("#kbd-mod").textContent = isMac ? "⌘" : "Ctrl";
+
+  const goTo = (id) => () => document.getElementById(id).scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+  const ACTIONS = [
+    ...[...document.querySelectorAll("main section[id]")].map((s) => ({ group: "go to", label: "/" + s.id, run: goTo(s.id) })),
+    ...D.projects.map((p) => ({ group: "open", label: p.name, hint: "case study", run: () => COMMANDS.open([p.id]) })),
+    { group: "action", label: "copy email", hint: D.contact.email, run: async () => {
+      try { await navigator.clipboard.writeText(D.contact.email); toast("✓ email copied to clipboard"); }
+      catch (e) { window.location.href = mailto(); }
+    } },
+    { group: "action", label: "send email", hint: D.contact.email, run: () => (window.location.href = mailto()) },
+    D.contact.github && { group: "action", label: "open github", hint: handle(D.contact.github), run: () => window.open(D.contact.github, "_blank", "noopener") },
+    D.contact.linkedin && { group: "action", label: "open linkedin", run: () => window.open(D.contact.linkedin, "_blank", "noopener") },
+    { group: "action", label: "download resume", hint: D.contact.resume, when: () => !cv.hidden, run: () => cv.click() },
+    { group: "action", label: "toggle live logs", run: () => setCollapsed(!logBox.classList.contains("collapsed")) },
+    { group: "action", label: "back to top", run: () => scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" }) },
+    { group: "secret", label: "sudo hire me", run: () => hire() },
+  ].filter(Boolean);
+
+  let palItems = [];
+  let palSel = 0;
+  let palReturn = null;
+
+  // Subsequence match, so "ghb" finds "open github".
+  const fuzzy = (q, text) => {
+    let i = 0;
+    for (const ch of text.toLowerCase()) if (ch === q[i]) i++;
+    return i === q.length;
+  };
+
+  function renderPalette() {
+    const q = palIn.value.trim().toLowerCase().replace(/\s+/g, "");
+    palItems = ACTIONS.filter((a) => (!a.when || a.when()) && fuzzy(q, `${a.group}${a.label}${a.hint || ""}`.replace(/\s+/g, "")));
+    palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+    palList.innerHTML = palItems.length
+      ? palItems.map((a, i) => `<li role="option" id="pal-${i}" data-i="${i}" aria-selected="${i === palSel}"><span class="pg">${esc(a.group)}</span><span>${esc(a.label)}</span>${a.hint ? `<span class="ph">${esc(a.hint)}</span>` : ""}</li>`).join("")
+      : `<li class="empty">zsh: no matches found</li>`;
+    palIn.setAttribute("aria-activedescendant", palItems.length ? `pal-${palSel}` : "");
+    const sel = palList.children[palSel];
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+  }
+  function openPalette() {
+    if (!pal.hidden) return;
+    palReturn = document.activeElement;
+    pal.hidden = false;
+    palIn.value = "";
+    palSel = 0;
+    renderPalette();
+    palIn.focus();
+  }
+  function closePalette() {
+    pal.hidden = true;
+    if (palReturn) palReturn.focus({ preventScroll: true });
+  }
+  function runPalette(i) {
+    const a = palItems[i];
+    if (!a) return;
+    closePalette();
+    a.run();
+  }
+
+  $("#palette-open").addEventListener("click", openPalette);
+  palIn.addEventListener("input", () => { palSel = 0; renderPalette(); });
+  palIn.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = palItems.length || 1;
+      palSel = (palSel + (e.key === "ArrowDown" ? 1 : -1) + n) % n;
+      renderPalette();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      runPalette(palSel);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closePalette();
+    }
+  });
+  palList.addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-i]");
+    if (li) runPalette(+li.dataset.i);
+  });
+  palList.addEventListener("pointermove", (e) => {
+    const li = e.target.closest("li[data-i]");
+    if (li && +li.dataset.i !== palSel) { palSel = +li.dataset.i; renderPalette(); }
+  });
+  pal.addEventListener("click", (e) => { if (e.target === pal) closePalette(); });
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      pal.hidden ? openPalette() : closePalette();
+    }
+  });
+
+  /* ---------- GitHub live stats ---------- */
+  (async () => {
+    const box = $("#gh");
+    const user = (D.contact.github || "").replace(/\/+$/, "").split("/").pop();
+    if (!user) return $("#github").remove();
+    const key = "gh:" + user;
+    let data = null;
+    try { data = JSON.parse(sessionStorage.getItem(key)); } catch (e) {}
+
+    if (!data) {
+      const get = (path) => fetch("https://api.github.com" + path).then((r) => {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      });
+      try {
+        const [u, repos] = await Promise.all([get(`/users/${user}`), get(`/users/${user}/repos?per_page=100&sort=pushed`)]);
+        data = {
+          url: u.html_url, repos_count: u.public_repos, followers: u.followers, since: u.created_at,
+          repos: repos.filter((r) => !r.fork).map((r) => ({
+            name: r.name, url: r.html_url, desc: r.description, lang: r.language, stars: r.stargazers_count, pushed: r.pushed_at,
+          })),
+        };
+        try { sessionStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
+      } catch (err) {
+        box.innerHTML = `
+          <div class="response">
+            <div class="response-bar"><span class="code bad">503 Service Unavailable</span><span class="c-dim">api.github.com</span></div>
+            <pre class="json">${highlight({ error: "github_unreachable", hint: "rate limited or offline" })}</pre>
+            <ul class="links"><li><span class="method get">GET</span><a href="${esc(D.contact.github)}" target="_blank" rel="noopener">${esc(handle(D.contact.github))}</a></li></ul>
+          </div>`;
+        return;
+      }
+    }
+
+    const COLORS = ["#00f0ff", "#ff2bd6", "#39ff14", "#f5ff3b", "#ff4d6d", "#9d7bff", "#9092ba"];
+    const langCount = {};
+    data.repos.forEach((r) => r.lang && (langCount[r.lang] = (langCount[r.lang] || 0) + 1));
+    const langs = Object.entries(langCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const langTotal = langs.reduce((n, [, c]) => n + c, 0) || 1;
+    const colorOf = Object.fromEntries(langs.map(([l], i) => [l, COLORS[i % COLORS.length]]));
+    const stars = data.repos.reduce((n, r) => n + r.stars, 0);
+    const ago = (iso) => {
+      const s = (Date.now() - new Date(iso)) / 1000;
+      for (const [u, n] of [["y", 31536000], ["mo", 2592000], ["d", 86400], ["h", 3600], ["m", 60]]) if (s >= n) return `${Math.floor(s / n)}${u} ago`;
+      return "just now";
+    };
+
+    box.innerHTML = `
+      <div class="response spot">
+        <div class="response-bar"><span class="code ok">200 OK</span><span class="c-dim">GET /users/${esc(user)}</span></div>
+        <dl class="gh-stats">
+          ${[["public repos", data.repos_count], stars ? ["stars earned", stars] : ["languages", Object.keys(langCount).length], ["followers", data.followers], ["coding since", new Date(data.since).getFullYear()]]
+            .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}
+        </dl>
+        <div class="gh-langs">
+          <h4>// languages by repo</h4>
+          <div class="lang-bar">${langs.map(([l, n]) => `<span style="background:${colorOf[l]};box-shadow:0 0 10px ${colorOf[l]}" data-w="${(n / langTotal) * 100}"></span>`).join("")}</div>
+          <ul class="lang-legend">${langs.map(([l, n]) => `<li><i style="background:${colorOf[l]}"></i>${esc(l)} <span class="c-dim">${Math.round((n / langTotal) * 100)}%</span></li>`).join("")}</ul>
+        </div>
+      </div>
+      <div class="response spot">
+        <div class="response-bar"><span class="c-dim">recent pushes</span><a href="${esc(data.url)}" target="_blank" rel="noopener">→ all repos</a></div>
+        <ul class="repos">${data.repos.slice(0, 4).map((r) => `
+          <li>
+            <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>
+            ${r.desc ? `<p>${esc(r.desc)}</p>` : ""}
+            <div class="repo-meta">
+              ${r.lang ? `<span><i style="background:${colorOf[r.lang] || "#9092ba"}"></i>${esc(r.lang)}</span>` : ""}
+              <span>★ ${r.stars}</span><span>updated ${ago(r.pushed)}</span>
+            </div>
+          </li>`).join("")}
+        </ul>
+      </div>`;
+
+    // Grow the language bar once it scrolls into view.
+    const bar = $(".lang-bar", box);
+    new IntersectionObserver(([e], obs) => {
+      if (!e.isIntersecting) return;
+      bar.querySelectorAll("span").forEach((s) => (s.style.width = s.dataset.w + "%"));
+      obs.disconnect();
+    }).observe(bar);
+  })();
 
   /* ---------- response-time badge ---------- */
   addEventListener("load", () => {

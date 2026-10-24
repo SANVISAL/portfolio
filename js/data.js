@@ -173,6 +173,7 @@ window.PORTFOLIO = {
   contact: {
     email: "sanvisal2302@gmail.com", // TODO: your email
     github: "https://github.com/SANVISAL",
+    resume: "resume.pdf", // put your CV next to index.html; the button stays hidden until the file exists
     // linkedin: "https://www.linkedin.com/in/your-handle",
   },
 };
