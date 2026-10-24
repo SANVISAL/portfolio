@@ -76,7 +76,7 @@
     setTimeout(() => heroName.classList.remove("on"), 500);
   }
   heroName.addEventListener("mouseenter", glitch);
-  (function loop() { setTimeout(() => { if (!document.hidden) glitch(); loop(); }, rand(3500, 7000)); })();
+  booted.then(() => setTimeout(glitch, 900));
 
   const toolCount = D.stack.reduce((n, g) => n + g.items.length, 0);
   const STATS = [
@@ -132,7 +132,7 @@
     return p.architecture
       .map((n, i) => {
         const node = `<span class="node${n.toLowerCase().startsWith(self) ? " self" : ""}">${esc(n)}</span>`;
-        return i === 0 ? node : `<span class="wire" style="--d:${(i * 0.25).toFixed(2)}s"></span>${node}`;
+        return i === 0 ? node : `<span class="wire"></span>${node}`;
       })
       .join("");
   }
@@ -147,7 +147,7 @@
       return `
       <article class="service" id="svc-${esc(p.id)}">
         <div class="svc-head">
-          <span class="svc-status ${s.cls}"><span class="dot ${s.cls}${s.cls === "ok" ? " pulse" : ""}"></span>${s.label}</span>
+          <span class="svc-status ${s.cls}"><span class="dot ${s.cls}"></span>${s.label}</span>
           <span>${esc(p.version)}</span>
         </div>
         <h3>${esc(p.name)}</h3>
@@ -258,16 +258,49 @@
       return;
     }
 
-    const ms = rand(18, 64);
-    code.className = "code created";
-    code.innerHTML = `201 Created <span class="c-dim">· ${ms}ms</span>`;
-    $("#contact-json").innerHTML = highlight({
-      status: "queued",
-      id: "msg_" + Math.random().toString(36).slice(2, 10),
-      message: `Thanks ${data.name.trim().split(" ")[0]}, opening your mail client to deliver this.`,
-    });
-    window.location.href = mailto(`Hello from ${data.name}`, `${data.message}\n\n— ${data.name} <${data.email}>`);
+    const first = data.name.trim().split(" ")[0];
+    if (data._gotcha) return; // bots fill the hidden field
+    if (!D.contact.formEndpoint) {
+      code.className = "code created";
+      code.innerHTML = `201 Created <span class="c-dim">· mailto</span>`;
+      $("#contact-json").innerHTML = highlight({ status: "handed_off", message: `Thanks ${first}, opening your mail client to deliver this.` });
+      window.location.href = mailto(`Hello from ${data.name}`, `${data.message}\n\n— ${data.name} <${data.email}>`);
+      return;
+    }
+
+    const send = $("#contact-send");
+    const t0 = performance.now();
+    send.disabled = true;
+    code.className = "code idle";
+    code.textContent = "sending…";
+    $("#contact-json").innerHTML = "";
+    fetch(D.contact.formEndpoint, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } })
+      .then(async (r) => {
+        const ms = Math.round(performance.now() - t0);
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw Object.assign(new Error(), { status: r.status, body, ms });
+        code.className = "code created";
+        code.innerHTML = `${r.status} ${esc(r.statusText || "OK")} <span class="c-dim">· ${ms}ms</span>`;
+        $("#contact-json").innerHTML = highlight({ status: "delivered", message: `Thanks ${first}, I'll reply to ${data.email} soon.` });
+        form.reset();
+      })
+      .catch((err) => {
+        code.className = "code bad";
+        code.textContent = err.status ? `${err.status} request failed` : "network error";
+        $("#contact-json").innerHTML = highlight({
+          error: (err.body && err.body.error) || "delivery_failed",
+          fallback: `email ${D.contact.email} directly`,
+        });
+      })
+      .finally(() => (send.disabled = false));
   });
+
+  if (D.contact.formEndpoint) {
+    $("#contact-url").textContent = D.contact.formEndpoint.replace(/^https?:\/\//, "");
+    $("#contact-note").textContent = "Delivered straight to my inbox.";
+  } else {
+    $("#contact-url").textContent = `mailto:${D.contact.email}`;
+  }
 
   /* ---------- terminal ---------- */
   const term = $("#term-body");
@@ -554,9 +587,8 @@
     else revealer.observe(el);
   });
 
-  document.querySelectorAll(".service, .panel, .response, .request").forEach((el) => el.classList.add("spot"));
   document.addEventListener("pointermove", (e) => {
-    const card = e.target.closest && e.target.closest(".spot");
+    const card = e.target.closest && e.target.closest(".service");
     if (!card) return;
     const r = card.getBoundingClientRect();
     card.style.setProperty("--mx", `${e.clientX - r.left}px`);
@@ -693,7 +725,7 @@
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
       card.classList.add("tilting");
-      card.style.transform = `perspective(900px) rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 9).toFixed(2)}deg) translateY(-4px)`;
+      card.style.transform = `perspective(1000px) rotateX(${(-py * 4).toFixed(2)}deg) rotateY(${(px * 5).toFixed(2)}deg) translateY(-3px)`;
     });
     $("#services").addEventListener("pointerout", (e) => {
       const card = e.target.closest(".service");
@@ -868,19 +900,19 @@
     };
 
     box.innerHTML = `
-      <div class="response spot">
+      <div class="response">
         <div class="response-bar"><span class="code ok">200 OK</span><span class="c-dim">GET /users/${esc(user)}</span></div>
         <dl class="gh-stats">
           ${[["public repos", data.repos_count], stars ? ["stars earned", stars] : ["languages", Object.keys(langCount).length], ["followers", data.followers], ["coding since", new Date(data.since).getFullYear()]]
             .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}
         </dl>
         <div class="gh-langs">
-          <h4>// languages by repo</h4>
+          <p class="gh-label">// languages by repo</p>
           <div class="lang-bar">${langs.map(([l, n]) => `<span style="background:${colorOf[l]};box-shadow:0 0 10px ${colorOf[l]}" data-w="${(n / langTotal) * 100}"></span>`).join("")}</div>
           <ul class="lang-legend">${langs.map(([l, n]) => `<li><i style="background:${colorOf[l]}"></i>${esc(l)} <span class="c-dim">${Math.round((n / langTotal) * 100)}%</span></li>`).join("")}</ul>
         </div>
       </div>
-      <div class="response spot">
+      <div class="response">
         <div class="response-bar"><span class="c-dim">recent pushes</span><a href="${esc(data.url)}" target="_blank" rel="noopener">→ all repos</a></div>
         <ul class="repos">${data.repos.slice(0, 4).map((r) => `
           <li>

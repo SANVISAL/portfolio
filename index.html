@@ -3,8 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>San Visal · Backend Engineer</title>
-  <meta name="description" content="San Visal, backend engineer building reliable APIs, data pipelines, and distributed systems.">
+  <title>San Visal · Backend Developer</title>
+  <meta name="description" content="San Visal, backend developer in Phnom Penh building reliable APIs, microservices, and internal tools with TypeScript, Node.js, and AWS.">
+  <link rel="canonical" href="https://sanvisal.github.io/portfolio/">
+  <meta name="author" content="San Visal">
+
+  <!-- link previews (LinkedIn, Telegram, Slack, X, Facebook) -->
+  <meta property="og:type" content="profile">
+  <meta property="og:site_name" content="San Visal">
+  <meta property="og:title" content="San Visal · Backend Developer">
+  <meta property="og:description" content="Building APIs that don't wake you up at 3am. Projects, stack, and experience.">
+  <meta property="og:url" content="https://sanvisal.github.io/portfolio/">
+  <meta property="og:image" content="https://sanvisal.github.io/portfolio/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="San Visal, backend developer: terminal-style portfolio card">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="San Visal · Backend Developer">
+  <meta name="twitter:description" content="Building APIs that don't wake you up at 3am.">
+  <meta name="twitter:image" content="https://sanvisal.github.io/portfolio/og.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "San Visal",
+    "jobTitle": "Backend Developer",
+    "url": "https://sanvisal.github.io/portfolio/",
+    "address": { "@type": "PostalAddress", "addressLocality": "Phnom Penh", "addressCountry": "KH" },
+    "sameAs": ["https://github.com/SANVISAL"],
+    "knowsAbout": ["Node.js", "TypeScript", "Express", "MongoDB", "RabbitMQ", "Docker", "AWS", "Terraform", "API design"]
+  }
+  </script>
   <meta name="theme-color" content="#0a0a12">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a12'/%3E%3Cpath d='M8 10l6 6-6 6' stroke='%2300f0ff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 22h8' stroke='%23ff2bd6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,6 +78,15 @@
   </header>
 
   <main id="top">
+    <noscript>
+      <section class="section wrap noscript">
+        <h1>San Visal</h1>
+        <p>Backend developer in Phnom Penh, Cambodia. I build APIs, microservices, and internal tools with TypeScript, Node.js, MongoDB, RabbitMQ, Docker, and AWS.</p>
+        <p>Projects: <a href="https://github.com/SANVISAL/HatKaJob">neakhatka (internship marketplace)</a> ·
+          <a href="https://github.com/SANVISAL/Asset_Management">asset-manager (Google Sheets device tracker)</a></p>
+        <p>Contact: <a href="https://github.com/SANVISAL">github.com/SANVISAL</a></p>
+      </section>
+    </noscript>
     <!-- HERO -->
     <section class="hero wrap">
       <canvas class="net" id="net" aria-hidden="true"></canvas>
@@ -131,7 +169,7 @@
       </div>
       <div class="contact-grid">
         <form class="request" id="contact-form" novalidate>
-          <div class="response-bar"><span class="c-yellow">POST</span><span class="c-dim">https://visal.dev/api/contact</span></div>
+          <div class="response-bar"><span class="c-yellow">POST</span><span class="c-dim" id="contact-url"></span></div>
           <div class="req-body">
             <span class="c-dim">{</span>
             <label class="field"><span><span class="j-key">"name"</span>:</span>
@@ -143,11 +181,12 @@
             <label class="field field-msg"><span><span class="j-key">"message"</span>:</span>
               <textarea name="message" rows="4" required placeholder="&quot;Let's build something reliable.&quot;"></textarea>
             </label>
+            <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
             <span class="c-dim">}</span>
           </div>
           <div class="req-actions">
-            <button class="btn primary" type="submit">Send request ⏎</button>
-            <span class="c-dim small">Opens your email app with the message filled in.</span>
+            <button class="btn primary" type="submit" id="contact-send">Send request ⏎</button>
+            <span class="c-dim small" id="contact-note">Opens your email app with the message filled in.</span>
           </div>
         </form>
 

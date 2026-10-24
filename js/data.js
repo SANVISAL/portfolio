@@ -173,6 +173,10 @@ window.PORTFOLIO = {
   contact: {
     email: "sanvisal2302@gmail.com", // TODO: your email
     github: "https://github.com/SANVISAL",
+    // Free form backend so messages arrive without opening an email app: create a form at
+    // https://formspree.io, then paste its endpoint here, e.g. "https://formspree.io/f/abcdwxyz".
+    // Leave empty to fall back to mailto.
+    formEndpoint: "",
     resume: "resume.pdf", // put your CV next to index.html; the button stays hidden until the file exists
     // linkedin: "https://www.linkedin.com/in/your-handle",
   },
