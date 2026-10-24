@@ -30,6 +30,35 @@
   document.querySelectorAll("[data-bind]").forEach((el) => (el.textContent = D[el.dataset.bind]));
   $("#year").textContent = new Date().getFullYear();
 
+  /* ---------- hero: glitching name + stats ---------- */
+  const heroName = $("#hero-name");
+  heroName.dataset.text = D.name;
+  function glitch() {
+    if (reduceMotion || heroName.classList.contains("on")) return;
+    heroName.classList.add("on");
+    setTimeout(() => heroName.classList.remove("on"), 500);
+  }
+  heroName.addEventListener("mouseenter", glitch);
+  (function loop() { setTimeout(() => { if (!document.hidden) glitch(); loop(); }, rand(3500, 7000)); })();
+
+  const toolCount = D.stack.reduce((n, g) => n + g.items.length, 0);
+  const STATS = [
+    [D.projects.length, "", "projects"],
+    [D.about.years_experience, "y", "experience"],
+    [toolCount, "", "tools"],
+  ];
+  $("#hero-stats").innerHTML = STATS.map(([n, unit, label]) =>
+    `<div><dt>${esc(label)}</dt><dd data-n="${n}" data-unit="${esc(unit)}">${n}${esc(unit)}</dd></div>`).join("");
+  if (!reduceMotion) {
+    document.querySelectorAll("#hero-stats dd").forEach(async (dd) => {
+      const n = +dd.dataset.n;
+      for (let i = 0; i <= n; i++) {
+        dd.textContent = i + dd.dataset.unit;
+        await sleep(900 / Math.max(n, 1));
+      }
+    });
+  }
+
   /* ---------- tagline typing ---------- */
   (async () => {
     const el = $("#tagline");
@@ -404,10 +433,12 @@
   /* ---------- live log stream ---------- */
   const logBox = $("#logstream");
   const logList = $("#log-lines");
-  $("#log-toggle").addEventListener("click", () => {
-    const collapsed = logBox.classList.toggle("collapsed");
+  function setCollapsed(collapsed) {
+    logBox.classList.toggle("collapsed", collapsed);
     $("#log-toggle").setAttribute("aria-expanded", !collapsed);
-  });
+    if (!collapsed && !logList.children.length) for (let i = 0; i < 5; i++) addLog(true);
+  }
+  $("#log-toggle").addEventListener("click", () => setCollapsed(!logBox.classList.contains("collapsed")));
 
   const routes = ["/api/v1/invoices", "/api/v1/auth/token", "/api/v1/users/:id", "/healthz", "/api/v1/events", "/metrics"];
   const LOGS = [
@@ -421,16 +452,66 @@
     () => ["INFO", "lv-info", `p99 latency ${rand(30, 120)}ms · error rate 0.0${rand(1, 9)}%`],
   ];
 
-  function addLog() {
-    if (document.hidden || logBox.classList.contains("collapsed")) return;
+  function addLog(force) {
+    if (!force && (document.hidden || logBox.classList.contains("collapsed"))) return;
     const [lvl, cls, msg] = pick(LOGS)();
     const li = document.createElement("li");
     li.innerHTML = `<span class="ts">${new Date().toTimeString().slice(0, 8)}</span> <span class="${cls}">[${lvl}]</span> ${esc(msg)}`;
     logList.appendChild(li);
     while (logList.children.length > 7) logList.firstElementChild.remove();
   }
-  if (getComputedStyle(logBox).display !== "none") for (let i = 0; i < 5; i++) addLog();
+  // Start collapsed unless there's room beside the content, and stay out of the way of the hero terminal.
+  setCollapsed(innerWidth < 1900);
+  new IntersectionObserver(([e]) => logBox.classList.toggle("away", e.isIntersecting)).observe($("#terminal"));
   setInterval(addLog, reduceMotion ? 5000 : 2200);
+
+  /* ---------- scroll effects ---------- */
+  const revealTargets = [
+    ".endpoint", ".about-bio", "#about .response", ".service", ".panel", ".commit", ".request", "#contact-response",
+  ];
+  const revealer = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add("in");
+      revealer.unobserve(e.target);
+    });
+  }, { rootMargin: "0px 0px -8% 0px" });
+  document.querySelectorAll(revealTargets.join(",")).forEach((el) => {
+    const siblings = [...el.parentElement.children].filter((c) => c.matches(revealTargets.join(",")));
+    el.style.setProperty("--rd", `${Math.min(siblings.indexOf(el), 4) * 0.08}s`);
+    el.classList.add("reveal");
+    if (reduceMotion) el.classList.add("in");
+    else revealer.observe(el);
+  });
+
+  document.querySelectorAll(".service, .panel, .response, .request").forEach((el) => el.classList.add("spot"));
+  document.addEventListener("pointermove", (e) => {
+    const card = e.target.closest && e.target.closest(".spot");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    card.style.setProperty("--my", `${e.clientY - r.top}px`);
+  });
+
+  const navLinks = [...document.querySelectorAll(".nav a")];
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) navLinks.forEach((a) => a.classList.toggle("active", a.hash === "#" + e.target.id));
+    });
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll("main section[id]").forEach((s) => spy.observe(s));
+
+  const progress = $("#progress");
+  let ticking = false;
+  addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      progress.style.setProperty("--p", max > 0 ? scrollY / max : 0);
+      ticking = false;
+    });
+  }, { passive: true });
 
   /* ---------- response-time badge ---------- */
   addEventListener("load", () => {
