@@ -177,7 +177,7 @@ window.PORTFOLIO = {
     // https://formspree.io, then paste its endpoint here, e.g. "https://formspree.io/f/abcdwxyz".
     // Leave empty to fall back to mailto.
     formEndpoint: "",
-    resume: "resume.pdf", // put your CV next to index.html; the button stays hidden until the file exists
+    resume: "resume.pdf", // file next to index.html; set to "" to hide the resume button
     // linkedin: "https://www.linkedin.com/in/your-handle",
   },
 };

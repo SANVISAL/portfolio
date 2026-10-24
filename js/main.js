@@ -620,15 +620,16 @@
     const c = $("#net");
     const ctx = c.getContext("2d");
     const hero = $(".hero");
-    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const lite = matchMedia("(pointer: coarse)").matches; // phones: fewer nodes, 30fps
+    const dpr = Math.min(devicePixelRatio || 1, lite ? 1.5 : 2);
     const LINK = 150, MOUSE = 190;
-    let W = 0, H = 0, nodes = [], packets = [], mouse = null, visible = true, raf = 0, lastSpawn = 0;
+    let W = 0, H = 0, nodes = [], packets = [], mouse = null, visible = true, raf = 0, lastSpawn = 0, ready = false, frame = 0;
 
     function size() {
       W = c.clientWidth; H = c.clientHeight;
       c.width = W * dpr; c.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.min(90, Math.round((W * H) / 15000));
+      const n = Math.min(90, Math.round((W * H) / (lite ? 24000 : 15000)));
       nodes = Array.from({ length: n }, () => ({
         x: Math.random() * W, y: Math.random() * H,
         vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35,
@@ -697,13 +698,13 @@
     function loop(now) {
       raf = 0;
       if (!visible || document.hidden) return;
-      draw(now);
+      if (!lite || frame++ % 2 === 0) draw(now);
       raf = requestAnimationFrame(loop);
     }
-    const start = () => { if (!raf && !reduceMotion) raf = requestAnimationFrame(loop); };
+    const start = () => { if (ready && !raf && !reduceMotion) raf = requestAnimationFrame(loop); };
 
     size();
-    if (reduceMotion) draw(0, true);
+    draw(0, true);
     new ResizeObserver(() => { size(); if (reduceMotion) draw(0, true); }).observe(hero);
     new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(c);
     document.addEventListener("visibilitychange", start);
@@ -713,7 +714,9 @@
       mouse = y >= 0 && y <= r.height ? { x, y } : null;
     }, { passive: true });
     document.addEventListener("pointerleave", () => (mouse = null));
-    start();
+    // Keep the first seconds of main-thread time for loading; animate once the intro is done and the page is idle.
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 200));
+    booted.then(() => idle(() => { ready = true; start(); }, { timeout: 1500 }));
   })();
 
   /* ---------- 3D tilt on project cards ---------- */
@@ -738,11 +741,9 @@
 
   /* ---------- resume button ---------- */
   const cv = $("#cv-btn");
-  if (D.contact.resume) {
-    cv.href = D.contact.resume;
-    if (location.protocol === "file:") cv.hidden = false;
-    else fetch(D.contact.resume, { method: "HEAD" }).then((r) => (cv.hidden = !r.ok)).catch(() => {});
-  }
+  // Rendered visible in the HTML so it never shifts the layout; hide it only when no resume is configured.
+  if (D.contact.resume) cv.href = D.contact.resume;
+  else cv.hidden = true;
 
   /* ---------- toast ---------- */
   let toastTimer = 0;
