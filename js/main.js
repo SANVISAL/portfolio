@@ -587,6 +587,63 @@
     else revealer.observe(el);
   });
 
+  /* ---------- about: "system breach" screen glitch ---------- */
+  const aboutTitle = $("#about .endpoint h2");
+  aboutTitle.classList.add("glitch");
+  aboutTitle.dataset.text = aboutTitle.textContent;
+  let breaching = false;
+  async function breach() {
+    if (reduceMotion || breaching) return;
+    breaching = true;
+    const about = $("#about");
+    const box = document.createElement("div");
+    box.className = "breach";
+    box.setAttribute("aria-hidden", "true");
+    const colors = ["var(--cyan)", "var(--magenta)", "var(--green)", "#fff"];
+    box.innerHTML = `<div class="noise"></div><div class="flash"></div>` +
+      Array.from({ length: 9 }, () =>
+        `<i class="tear" style="top:${rand(0, 95)}%;height:${rand(2, 26)}px;--x:${rand(-40, 40)}px;--c:${pick(colors)};animation-delay:-${rand(0, 120)}ms"></i>`).join("") +
+      `<pre class="breach-log"></pre>`;
+    document.body.appendChild(box);
+    document.body.classList.add("breaching");
+    about.classList.add("hacked");
+    aboutTitle.classList.remove("on"); void aboutTitle.offsetWidth; aboutTitle.classList.add("on");
+
+    // Re-roll the tears while the log types, so the screen keeps tearing in new places.
+    const reroll = setInterval(() => box.querySelectorAll(".tear").forEach((t) => {
+      t.style.top = `${rand(0, 95)}%`;
+      t.style.height = `${rand(2, 26)}px`;
+      t.style.setProperty("--x", `${rand(-40, 40)}px`);
+    }), 90);
+    const log = $(".breach-log", box);
+    const lines = [
+      "⚠ INTRUSION DETECTED",
+      `> tracing source ... ${rand(10, 223)}.${rand(0, 255)}.${rand(0, 255)}.${rand(1, 254)}`,
+      "> firewall ........ BYPASSED",
+      "> decrypting /about.json",
+      "> injecting payload [██████████] 100%",
+      `<b>ACCESS GRANTED · root@${esc(D.name.split(" ")[0].toLowerCase())}</b>`,
+    ];
+    for (const line of lines) {
+      log.innerHTML += (log.innerHTML ? "\n" : "") + line;
+      await sleep(rand(140, 220));
+    }
+    await sleep(350);
+    document.body.classList.remove("breaching");
+    clearInterval(reroll);
+    box.classList.add("out");
+    await sleep(350);
+    box.remove();
+    about.classList.remove("hacked");
+    breaching = false;
+  }
+  new IntersectionObserver(([e], obs) => {
+    if (!e.isIntersecting) return;
+    obs.disconnect();
+    setTimeout(breach, 250);
+  }, { threshold: 0.35 }).observe($("#about"));
+  aboutTitle.addEventListener("click", breach);
+
   document.addEventListener("pointermove", (e) => {
     const card = e.target.closest && e.target.closest(".service");
     if (!card) return;

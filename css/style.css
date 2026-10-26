@@ -509,3 +509,52 @@ kbd {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* about: "system breach" screen glitch (fires once when #about scrolls into view) */
+.breach { position: fixed; inset: 0; z-index: 80; pointer-events: none; overflow: hidden; }
+.breach .tear {
+  position: absolute; left: -5%; width: 110%; mix-blend-mode: difference;
+  background: var(--c, var(--cyan)); animation: tear .12s steps(1) infinite;
+}
+@keyframes tear {
+  0% { transform: translateX(var(--x, 0)); opacity: .9; }
+  50% { transform: translateX(calc(var(--x, 0) * -1)); opacity: .35; }
+}
+.breach .noise {
+  position: absolute; inset: 0; opacity: .14;
+  background: repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 2px), repeating-linear-gradient(90deg, rgba(255, 43, 214, .5) 0 2px, transparent 2px 5px);
+  animation: noise .08s steps(2) infinite;
+}
+@keyframes noise { 50% { transform: translate(-3px, 2px); } }
+.breach .flash { position: absolute; inset: 0; background: var(--red); mix-blend-mode: overlay; animation: flash 1.4s steps(1) both; }
+@keyframes flash { 0%, 9%, 30%, 34% { opacity: .55; } 6%, 12%, 32%, 100% { opacity: 0; } }
+.breach-log {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 460px); margin: 0; padding: 16px 18px;
+  background: rgba(7, 7, 13, .92); border: 1px solid var(--red); border-radius: var(--radius);
+  box-shadow: 0 0 0 1px rgba(255, 77, 109, .25), 0 0 40px rgba(255, 77, 109, .35);
+  font: 13px/1.7 var(--mono); color: var(--red); white-space: pre-wrap;
+  animation: logShake .1s steps(2) infinite;
+}
+.breach-log b { color: var(--green); text-shadow: 0 0 10px var(--green); }
+@keyframes logShake { 50% { transform: translate(calc(-50% + 2px), calc(-50% - 1px)); } }
+.breach.out { animation: breachOut .35s steps(4) forwards; }
+@keyframes breachOut { to { opacity: 0; clip-path: inset(50% 0 50% 0); } }
+
+body.breaching main { animation: screenShake .16s steps(2) infinite; }
+@keyframes screenShake {
+  0% { transform: translate(-3px, 1px) skewX(.6deg); filter: drop-shadow(-4px 0 var(--magenta)) drop-shadow(4px 0 var(--cyan)); }
+  50% { transform: translate(3px, -1px) skewX(-.6deg); filter: drop-shadow(4px 0 var(--magenta)) drop-shadow(-4px 0 var(--cyan)) hue-rotate(40deg); }
+}
+#about.hacked .about-grid { animation: hacked 1.2s steps(1) both; }
+@keyframes hacked {
+  0% { clip-path: inset(10% 0 60% 0); transform: translateX(-14px); }
+  8% { clip-path: inset(55% 0 20% 0); transform: translateX(12px); }
+  16% { clip-path: inset(0 0 85% 0); transform: translateX(-6px); }
+  24% { clip-path: inset(30% 0 40% 0); transform: translateX(18px); }
+  32% { clip-path: none; transform: none; filter: invert(1) hue-rotate(180deg); }
+  36% { filter: none; }
+  48% { clip-path: inset(70% 0 5% 0); transform: translateX(-10px); }
+  56%, 100% { clip-path: none; transform: none; }
+}
+#about .endpoint h2.glitch { cursor: pointer; }
