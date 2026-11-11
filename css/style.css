@@ -526,7 +526,7 @@ kbd {
   animation: noise .08s steps(2) infinite;
 }
 @keyframes noise { 50% { transform: translate(-3px, 2px); } }
-.breach .flash { position: absolute; inset: 0; background: var(--red); mix-blend-mode: overlay; animation: flash 1.4s steps(1) both; }
+.breach .flash { position: absolute; inset: 0; background: var(--red); mix-blend-mode: overlay; animation: flash 1.4s steps(1) 2 both; }
 @keyframes flash { 0%, 9%, 30%, 34% { opacity: .55; } 6%, 12%, 32%, 100% { opacity: 0; } }
 .breach-log {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -546,7 +546,7 @@ body.breaching main { animation: screenShake .16s steps(2) infinite; }
   0% { transform: translate(-3px, 1px) skewX(.6deg); filter: drop-shadow(-4px 0 var(--magenta)) drop-shadow(4px 0 var(--cyan)); }
   50% { transform: translate(3px, -1px) skewX(-.6deg); filter: drop-shadow(4px 0 var(--magenta)) drop-shadow(-4px 0 var(--cyan)) hue-rotate(40deg); }
 }
-#about.hacked .about-grid { animation: hacked 1.2s steps(1) both; }
+#about.hacked .about-grid { animation: hacked 1.2s steps(1) 2 both; }
 @keyframes hacked {
   0% { clip-path: inset(10% 0 60% 0); transform: translateX(-14px); }
   8% { clip-path: inset(55% 0 20% 0); transform: translateX(12px); }

@@ -626,9 +626,9 @@
     ];
     for (const line of lines) {
       log.innerHTML += (log.innerHTML ? "\n" : "") + line;
-      await sleep(rand(140, 220));
+      await sleep(rand(320, 480));
     }
-    await sleep(350);
+    await sleep(1000);
     document.body.classList.remove("breaching");
     clearInterval(reroll);
     box.classList.add("out");
@@ -637,10 +637,9 @@
     about.classList.remove("hacked");
     breaching = false;
   }
-  new IntersectionObserver(([e], obs) => {
-    if (!e.isIntersecting) return;
-    obs.disconnect();
-    setTimeout(breach, 250);
+  // Replays every time /about scrolls back into view.
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting) setTimeout(breach, 250);
   }, { threshold: 0.35 }).observe($("#about"));
   aboutTitle.addEventListener("click", breach);
 

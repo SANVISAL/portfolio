@@ -180,4 +180,13 @@ window.PORTFOLIO = {
     resume: "resume.pdf", // file next to index.html; set to "" to hide the resume button
     // linkedin: "https://www.linkedin.com/in/your-handle",
   },
+
+  // Bit, the little robot in the bottom-left corner.
+  // Without an endpoint it answers from this file with keyword matching.
+  // Deploy worker/ (see worker/README.md) and paste its URL + "/chat" here to let it
+  // answer free-form questions with Claude. If the endpoint fails, it falls back to local answers.
+  assistant: {
+    name: "Bit",
+    endpoint: "", // e.g. "https://portfolio-bot.<your-subdomain>.workers.dev/chat"
+  },
 };

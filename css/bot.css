@@ -1,0 +1,116 @@
+/* Bit: portfolio assistant robot (bottom-left; the log stream owns bottom-right) */
+.bot { position: fixed; left: 16px; bottom: 16px; z-index: 50; font: 13px/1.55 var(--mono); }
+.boot-on .bot { display: none; }
+
+/* robot drawing */
+.bot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.bot-head { fill: var(--surface-2); stroke: var(--cyan); stroke-width: 2; }
+.bot-visor { fill: var(--term); stroke: var(--line-2); stroke-width: 1; }
+.bot-eye { fill: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); transform-box: fill-box; transform-origin: center; transition: transform .08s; }
+.bot-ear, .bot-body { fill: var(--surface); stroke: var(--line-2); stroke-width: 1.5; }
+.bot-stroke { stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; fill: none; }
+.bot-mouth { stroke: var(--magenta); }
+.bot-antenna { fill: var(--magenta); filter: drop-shadow(0 0 4px var(--magenta)); }
+.bot.blink .bot-eye { transform: scaleY(.12); }
+.bot-eyes { transition: transform .12s ease-out; }
+
+/* floating button */
+.bot-fab {
+  all: unset; box-sizing: border-box; display: block; width: 64px; height: 64px; padding: 6px; cursor: pointer;
+  border-radius: 18px; background: rgba(7, 7, 13, .85); border: 1px solid var(--line-2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .5), 0 0 22px rgba(0, 240, 255, .15);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  animation: botFloat 4s ease-in-out infinite; transition: border-color .2s, box-shadow .2s;
+}
+.bot-fab:hover { border-color: var(--cyan); box-shadow: 0 8px 30px rgba(0, 0, 0, .5), 0 0 28px rgba(0, 240, 255, .35); }
+.bot-fab:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.bot.open .bot-fab { animation: none; border-color: var(--cyan); }
+.bot-fab.wave svg { animation: botWave 1.2s ease-in-out; transform-origin: 50% 90%; }
+.bot-fab.thinking .bot-antenna { animation: botPulse .7s ease-in-out infinite alternate; }
+@keyframes botFloat { 50% { transform: translateY(-5px); } }
+@keyframes botWave { 20%, 60% { transform: rotate(-10deg); } 40%, 80% { transform: rotate(10deg); } }
+@keyframes botPulse { to { fill: var(--yellow); filter: drop-shadow(0 0 7px var(--yellow)); } }
+
+/* speech bubble */
+.bot-bubble {
+  position: absolute; left: 0; bottom: 76px; width: max-content; max-width: min(280px, calc(100vw - 32px));
+  padding: 10px 30px 10px 12px; color: var(--text); cursor: pointer;
+  background: var(--term); border: 1px solid rgba(0, 240, 255, .45); border-radius: 12px 12px 12px 4px;
+  box-shadow: 0 0 22px rgba(0, 240, 255, .18); animation: botPop .3s ease-out;
+}
+.bot-bubble[hidden] { display: none; }
+.bot-bubble::after {
+  content: ""; position: absolute; left: 22px; bottom: -7px; width: 12px; height: 12px; transform: rotate(45deg);
+  background: var(--term); border-right: 1px solid rgba(0, 240, 255, .45); border-bottom: 1px solid rgba(0, 240, 255, .45);
+}
+.bot-bubble-x { all: unset; position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; text-align: center; line-height: 22px; color: var(--dim); cursor: pointer; border-radius: 6px; }
+.bot-bubble-x:hover { color: var(--white); background: var(--surface-2); }
+.bot-bubble-x:focus-visible { outline: 2px solid var(--cyan); }
+@keyframes botPop { from { opacity: 0; transform: translateY(8px) scale(.96); } }
+
+/* chat panel */
+.bot-panel {
+  position: absolute; left: 0; bottom: 76px; width: 360px; max-width: calc(100vw - 32px);
+  height: min(520px, calc(100vh - 120px)); height: min(520px, calc(100dvh - 120px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(7, 7, 13, .96); border: 1px solid var(--line-2); border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6), 0 0 30px rgba(0, 240, 255, .12);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: botPop .22s ease-out; transform-origin: bottom left;
+}
+.bot-panel[hidden] { display: none; }
+.bot-panel-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--white); }
+.bot-mini { width: 28px; height: 28px; flex: none; }
+.bot-close { all: unset; margin-left: auto; width: 28px; height: 28px; text-align: center; line-height: 28px; font-size: 18px; color: var(--muted); cursor: pointer; border-radius: 8px; }
+.bot-close:hover { color: var(--white); background: var(--surface-2); }
+.bot-close:focus-visible { outline: 2px solid var(--cyan); }
+
+.bot-log { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.bot-msg { flex: none; max-width: 88%; animation: botPop .2s ease-out; }
+.bot-msg.from-user { align-self: flex-end; }
+.bot-text { padding: 8px 11px; border-radius: 12px; overflow-wrap: anywhere; }
+.bot-msg.from-bot .bot-text { background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 4px; color: var(--text); }
+.bot-msg.from-user .bot-text { background: rgba(0, 240, 255, .1); border: 1px solid rgba(0, 240, 255, .35); border-top-right-radius: 4px; color: var(--white); }
+.bot-text a { color: var(--cyan); }
+.bot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bot-act, .bot-chip {
+  all: unset; box-sizing: border-box; cursor: pointer; padding: 4px 10px; border-radius: 999px; font: 12px/1.5 var(--mono);
+  color: var(--cyan); border: 1px solid rgba(0, 240, 255, .35); background: rgba(0, 240, 255, .05); transition: background .15s, color .15s;
+}
+.bot-act:hover, .bot-chip:hover { background: var(--cyan); color: var(--bg); }
+.bot-act:focus-visible, .bot-chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.bot-msg.typing .bot-text { display: inline-flex; gap: 4px; padding: 11px 13px; }
+.bot-msg.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); animation: botDot 1s infinite ease-in-out; }
+.bot-msg.typing i:nth-child(2) { animation-delay: .15s; }
+.bot-msg.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes botDot { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+.bot-chips { display: flex; gap: 6px; padding: 8px 12px; overflow-x: auto; border-top: 1px solid var(--line); scrollbar-width: none; }
+.bot-chips::-webkit-scrollbar { display: none; }
+.bot-chip { flex: none; color: var(--muted); border-color: var(--line-2); background: transparent; }
+
+.bot-form { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--term); }
+.bot-form .t-prompt { color: var(--magenta); }
+.bot-form input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--white); font: 14px var(--mono); }
+.bot-form input::placeholder { color: var(--dim); }
+.bot-form button { all: unset; cursor: pointer; padding: 2px 10px; border-radius: 6px; color: var(--bg); background: var(--cyan); font-weight: 700; }
+.bot-form button:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+.bot-form:focus-within { box-shadow: inset 0 1px 0 var(--cyan); }
+
+/* highlight a section the bot jumped to */
+.bot-flash { animation: botFlash 1.6s ease-out; border-radius: var(--radius); }
+@keyframes botFlash { 0%, 40% { box-shadow: 0 0 0 2px rgba(0, 240, 255, .55), 0 0 40px rgba(0, 240, 255, .2); } 100% { box-shadow: 0 0 0 2px transparent; } }
+
+@media (max-width: 600px) {
+  .bot { left: 12px; bottom: 12px; }
+  .bot-fab { width: 56px; height: 56px; }
+  .bot-panel { position: fixed; left: 12px; right: 12px; bottom: 80px; width: auto; max-width: none; height: min(560px, calc(100dvh - 100px)); }
+  .bot-bubble { bottom: 68px; }
+  .bot-form input { font-size: 16px; } /* no iOS zoom on focus */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bot-fab, .bot-fab.wave svg, .bot-panel, .bot-bubble, .bot-msg, .bot-flash { animation: none; }
+  .bot-msg.typing i { animation: none; opacity: .7; }
+}
