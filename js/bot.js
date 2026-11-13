@@ -1,6 +1,8 @@
-// Bit: a small assistant robot for the portfolio.
-// Answers from window.PORTFOLIO with keyword matching, and optionally from an AI endpoint
-// (worker/) when PORTFOLIO.assistant.endpoint is set. AI failures fall back to local answers.
+// Bit: a small, lively assistant robot for the portfolio.
+// - Flies after the cursor (spring physics), leans into turns, stops when you reach for it.
+// - Tour guide: flies next to each section heading as the visitor scrolls and explains it.
+// - Moods: happy on hover, surprised on fast scroll, talks while speaking, falls asleep when idle.
+// - Chat: answers from window.PORTFOLIO, or an AI endpoint (worker/) when configured.
 (() => {
   "use strict";
   const P = window.PORTFOLIO;
@@ -10,60 +12,86 @@
   const BOT = cfg.name || "Bit";
   const ENDPOINT = (cfg.endpoint || "").trim();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
   const root = document.documentElement;
   const first = (P.name || "").split(" ").slice(-1)[0] || P.name; // "Visal"
 
-  const store = {
+  const session = {
     get(k) { try { return sessionStorage.getItem("bot:" + k); } catch (e) { return null; } },
     set(k, v) { try { sessionStorage.setItem("bot:" + k, v); } catch (e) {} },
   };
+  const prefs = {
+    get(k, d) { try { const v = localStorage.getItem("bot:" + k); return v == null ? d : v === "1"; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("bot:" + k, v ? "1" : "0"); } catch (e) {} },
+  };
 
-  // ---------- DOM ----------
-  const ROBOT_SVG = `
+  // ---------- robot drawing ----------
+  const robotSVG = (full) => `
     <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-      <line x1="32" y1="5" x2="32" y2="14" class="bot-stroke"/>
-      <circle cx="32" cy="5" r="3.2" class="bot-antenna"/>
-      <rect x="10" y="14" width="44" height="34" rx="11" class="bot-head"/>
-      <rect x="15.5" y="21" width="33" height="19" rx="7" class="bot-visor"/>
-      <g class="bot-eyes">
-        <ellipse cx="25" cy="30.5" rx="3.6" ry="4.2" class="bot-eye"/>
-        <ellipse cx="39" cy="30.5" rx="3.6" ry="4.2" class="bot-eye"/>
+      ${full ? `<g class="b-flame"><path d="M27 59 Q32 74 37 59 Z" class="b-flame-out"/><path d="M29.5 59 Q32 67 34.5 59 Z" class="b-flame-in"/></g>` : ""}
+      <g class="b-rig">
+        ${full ? `<path d="M23 53 L15 58" class="b-arm b-arm-l"/><path d="M41 53 L49 58" class="b-arm b-arm-r"/>` : ""}
+        <rect x="22" y="50" width="20" height="9" rx="4" class="b-body"/>
+        <g class="b-head">
+          <line x1="32" y1="5" x2="32" y2="14" class="b-stroke"/>
+          <circle cx="32" cy="5" r="3.2" class="b-antenna"/>
+          <rect x="10" y="14" width="44" height="34" rx="11" class="b-skull"/>
+          <rect x="15.5" y="21" width="33" height="19" rx="7" class="b-visor"/>
+          <g class="b-eyes">
+            <ellipse cx="25" cy="30.5" rx="3.6" ry="4.2" class="b-eye"/>
+            <ellipse cx="39" cy="30.5" rx="3.6" ry="4.2" class="b-eye"/>
+            <path d="M21.5 32 q3.5 -5 7 0 M35.5 32 q3.5 -5 7 0" class="b-eye-happy"/>
+          </g>
+          <path d="M27 44 q5 3 10 0" class="b-stroke b-mouth b-mouth-smile"/>
+          <ellipse cx="32" cy="44.5" rx="2.4" ry="2.2" class="b-mouth b-mouth-o"/>
+          <rect x="5" y="25" width="5" height="12" rx="2.5" class="b-ear"/>
+          <rect x="54" y="25" width="5" height="12" rx="2.5" class="b-ear"/>
+        </g>
       </g>
-      <path d="M27 44 q5 3 10 0" class="bot-stroke bot-mouth"/>
-      <rect x="5" y="25" width="5" height="12" rx="2.5" class="bot-ear"/>
-      <rect x="54" y="25" width="5" height="12" rx="2.5" class="bot-ear"/>
-      <rect x="22" y="50" width="20" height="9" rx="4" class="bot-body"/>
+      ${full ? `<g class="b-zzz"><text x="50" y="12">z</text><text x="56" y="4">z</text></g>` : ""}
     </svg>`;
 
-  const wrap = document.createElement("div");
-  wrap.className = "bot";
-  wrap.innerHTML = `
+  // ---------- DOM ----------
+  const bot = document.createElement("div");
+  bot.className = "bot";
+  bot.innerHTML = `
     <div class="bot-bubble" id="bot-bubble" hidden>
-      <span id="bot-bubble-text"></span>
-      <button class="bot-bubble-x" type="button" aria-label="Dismiss">×</button>
+      <p class="bot-bubble-text" id="bot-bubble-text"></p>
+      <div class="bot-actions" id="bot-bubble-acts"></div>
+      <button class="bot-bubble-x" type="button" aria-label="Close tip">×</button>
     </div>
-    <section class="bot-panel" id="bot-panel" role="dialog" aria-label="${BOT}, portfolio assistant" hidden>
-      <header class="bot-panel-head">
-        <span class="bot-mini">${ROBOT_SVG}</span>
-        <span><strong>${BOT}</strong><span class="c-dim small"> · ${ENDPOINT ? "AI assistant" : "assistant"}</span></span>
-        <button class="bot-close" type="button" aria-label="Close chat">×</button>
-      </header>
-      <div class="bot-log" id="bot-log" role="log" aria-live="polite"></div>
-      <div class="bot-chips" id="bot-chips" aria-label="Suggested questions"></div>
-      <form class="bot-form" id="bot-form" autocomplete="off">
-        <span class="t-prompt" aria-hidden="true">&gt;</span>
-        <input id="bot-in" type="text" maxlength="500" placeholder="Ask about ${first}…" aria-label="Ask ${BOT} a question">
-        <button type="submit" aria-label="Send">↵</button>
-      </form>
-    </section>
-    <button class="bot-fab" id="bot-fab" type="button" aria-expanded="false" aria-controls="bot-panel" aria-label="Chat with ${BOT}, the portfolio assistant">
-      ${ROBOT_SVG}
-    </button>`;
-  document.body.appendChild(wrap);
+    <button class="bot-fab" id="bot-fab" type="button" aria-expanded="false" aria-controls="bot-panel"
+      aria-label="Chat with ${BOT}, the portfolio assistant">${robotSVG(true)}</button>`;
+
+  const panel = document.createElement("section");
+  panel.className = "bot-panel";
+  panel.id = "bot-panel";
+  panel.hidden = true;
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", BOT + ", portfolio assistant");
+  panel.innerHTML = `
+    <header class="bot-panel-head">
+      <span class="bot-mini">${robotSVG(false)}</span>
+      <span class="bot-title"><strong>${BOT}</strong><span class="c-dim small"> · ${ENDPOINT ? "AI assistant" : "assistant"}</span></span>
+      <span class="bot-toggles">
+        ${finePointer && !reduceMotion ? `<button class="bot-toggle" type="button" data-pref="follow" title="Follow your cursor">🐾 follow</button>` : ""}
+        <button class="bot-toggle" type="button" data-pref="tour" title="Explain each section as you scroll">🧭 tour</button>
+      </span>
+      <button class="bot-close" type="button" aria-label="Close chat">×</button>
+    </header>
+    <div class="bot-log" id="bot-log" role="log" aria-live="polite"></div>
+    <div class="bot-chips" id="bot-chips" aria-label="Suggested questions"></div>
+    <form class="bot-form" id="bot-form" autocomplete="off">
+      <span class="t-prompt" aria-hidden="true">&gt;</span>
+      <input id="bot-in" type="text" maxlength="500" placeholder="Ask about ${first}…" aria-label="Ask ${BOT} a question">
+      <button type="submit" aria-label="Send">↵</button>
+    </form>`;
+
+  document.body.append(panel, bot);
 
   const $ = (id) => document.getElementById(id);
-  const fab = $("bot-fab"), panel = $("bot-panel"), log = $("bot-log"), chipsEl = $("bot-chips");
-  const form = $("bot-form"), input = $("bot-in"), bubble = $("bot-bubble"), bubbleText = $("bot-bubble-text");
+  const fab = $("bot-fab"), log = $("bot-log"), chipsEl = $("bot-chips"), form = $("bot-form"), input = $("bot-in");
+  const bubble = $("bot-bubble"), bubbleText = $("bot-bubble-text"), bubbleActs = $("bot-bubble-acts");
 
   // ---------- helpers ----------
   const el = (tag, cls, text) => {
@@ -74,6 +102,8 @@
   };
   const norm = (s) => " " + s.toLowerCase().replace(/[^a-z0-9+#.\s-]/g, " ").replace(/\s+/g, " ") + " ";
   const listJoin = (a) => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Text with safe auto-links (URLs, emails). Never uses innerHTML for content.
   function richText(parent, text) {
@@ -90,7 +120,330 @@
     if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
   }
 
-  // ---------- actions ----------
+  // =====================================================================
+  //  BODY: position, spring physics, moods
+  // =====================================================================
+  const pos = { x: -120, y: innerHeight - 90, vx: 0, vy: 0 }; // starts off-screen, flies in
+  const cursor = { x: -1, y: -1, inside: false, t: 0 };
+  let mode = "home";      // home | follow | guide
+  let guideTarget = null; // () => {x, y} | null
+  let raf = 0, lastFrame = 0;
+  let size = 64;
+  let lookAt = null;      // {x, y} the eyes look at
+
+  const followOn = () => finePointer && !reduceMotion && prefs.get("follow", true);
+  const tourOn = () => prefs.get("tour", true) && session.get("tour-off") !== "1";
+
+  function home() {
+    const m = innerWidth <= 600 ? 12 : 16;
+    return { x: m, y: innerHeight - size - m };
+  }
+
+  function target() {
+    if (!panel.hidden || bot.classList.contains("sleepy")) return home();
+    if (mode === "guide" && guideTarget) {
+      const t = guideTarget();
+      if (t) return t;
+    }
+    if (mode === "follow" && cursor.inside) {
+      // Hover beside the cursor, on the side we're already on; stop when the visitor reaches for us.
+      const cx = pos.x + size / 2, cy = pos.y + size / 2;
+      const dx = cx - cursor.x, dy = cy - cursor.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < 84) return { x: pos.x, y: pos.y };
+      const keep = 96;
+      return { x: cursor.x + (dx / d) * keep - size / 2, y: cursor.y + (dy / d) * keep - size / 2 };
+    }
+    if (mode === "follow") return { x: pos.x, y: pos.y };
+    return home();
+  }
+
+  function frame(now) {
+    raf = 0;
+    const dt = Math.min(30, lastFrame ? (now - lastFrame) / 16.67 : 1);
+    lastFrame = now;
+    size = fab.offsetWidth || 64;
+
+    let t = target();
+    t = { x: clamp(t.x, 8, innerWidth - size - 8), y: clamp(t.y, 64, innerHeight - size - 8) };
+
+    if (reduceMotion) {
+      pos.x = t.x; pos.y = t.y; pos.vx = pos.vy = 0;
+    } else {
+      // Fixed 60fps sub-steps keep the spring stable even when the browser throttles frames.
+      // Slightly under-damped: a small, lively overshoot, never a fling.
+      const k = mode === "guide" ? 0.05 : 0.035, damp = mode === "guide" ? 0.7 : 0.74;
+      for (let i = 0, n = Math.max(1, Math.round(dt)); i < n; i++) {
+        pos.vx = (pos.vx + (t.x - pos.x) * k) * damp;
+        pos.vy = (pos.vy + (t.y - pos.y) * k) * damp;
+        pos.x += pos.vx;
+        pos.y += pos.vy;
+      }
+      const maxX = innerWidth - size - 8, maxY = innerHeight - size - 8;
+      if (pos.x < 8 || pos.x > maxX) { pos.x = clamp(pos.x, 8, maxX); pos.vx = 0; }
+      if (pos.y < 64 || pos.y > maxY) { pos.y = clamp(pos.y, 64, maxY); pos.vy = 0; }
+    }
+
+    const speed = Math.hypot(pos.vx, pos.vy);
+    const tilt = clamp(pos.vx * 1.6, -22, 22);
+    bot.style.transform = `translate3d(${pos.x.toFixed(1)}px, ${pos.y.toFixed(1)}px, 0)`;
+    bot.style.setProperty("--tilt", tilt.toFixed(1) + "deg");
+    bot.classList.toggle("flying", speed > 2.2);
+    placeBubble();
+    aimEyes();
+
+    const settled = speed < 0.05 && Math.abs(t.x - pos.x) < 0.5 && Math.abs(t.y - pos.y) < 0.5;
+    if (!settled || mode === "guide") raf = requestAnimationFrame(frame);
+    else lastFrame = 0;
+  }
+  function kick() { if (!raf) raf = requestAnimationFrame(frame); }
+
+  // eyes
+  const eyeGroups = document.querySelectorAll(".bot .b-eyes");
+  function aimEyes() {
+    if (reduceMotion) return;
+    const p = lookAt || (cursor.inside ? cursor : null);
+    let tx = 0, ty = 0;
+    if (p) {
+      const dx = p.x - (pos.x + size / 2), dy = p.y - (pos.y + size / 2);
+      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 260);
+      tx = (dx / d) * 3.4 * k; ty = (dy / d) * 2.6 * k;
+    }
+    eyeGroups.forEach((g) => g.setAttribute("transform", `translate(${tx.toFixed(2)} ${ty.toFixed(2)})`));
+  }
+
+  // moods: happy | surprised | (none). Talking and sleepy are separate classes.
+  let moodTimer = 0;
+  function mood(name, ms = 1200) {
+    bot.classList.remove("mood-happy", "mood-surprised");
+    if (name) bot.classList.add("mood-" + name);
+    clearTimeout(moodTimer);
+    if (name && ms) moodTimer = setTimeout(() => bot.classList.remove("mood-" + name), ms);
+  }
+  function hop(kind = "hop") {
+    if (reduceMotion) return;
+    fab.classList.remove("hop", "wave"); void fab.offsetWidth; fab.classList.add(kind);
+    setTimeout(() => fab.classList.remove(kind), 900);
+  }
+
+  // blinking
+  if (!reduceMotion) {
+    (function blink() {
+      setTimeout(() => {
+        if (!bot.classList.contains("sleepy")) {
+          bot.classList.add("blink");
+          setTimeout(() => bot.classList.remove("blink"), 130);
+        }
+        blink();
+      }, 2200 + Math.random() * 3800);
+    })();
+  }
+
+  // sleep after a while with no activity; wake up on any input
+  let idleTimer = 0;
+  function activity() {
+    if (bot.classList.contains("sleepy")) {
+      bot.classList.remove("sleepy");
+      mood("surprised", 500);
+      hop();
+      kick();
+    }
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (!panel.hidden || !bubble.hidden) return activity();
+      bot.classList.add("sleepy");
+      hideBubble();
+      kick();
+    }, 40000);
+  }
+
+  // cursor tracking
+  addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    cursor.x = e.clientX; cursor.y = e.clientY; cursor.inside = true;
+    activity();
+    if (mode === "follow" || !reduceMotion) kick();
+  }, { passive: true });
+  document.addEventListener("pointerleave", () => { cursor.inside = false; kick(); });
+  addEventListener("blur", () => { cursor.inside = false; });
+  addEventListener("keydown", activity, { passive: true });
+  addEventListener("touchstart", activity, { passive: true });
+  addEventListener("resize", kick, { passive: true });
+
+  fab.addEventListener("pointerenter", () => { if (!bot.classList.contains("sleepy")) { mood("happy", 0); hop(); } });
+  fab.addEventListener("pointerleave", () => mood(null));
+
+  // =====================================================================
+  //  SPEECH BUBBLE
+  // =====================================================================
+  let speakId = 0, bubbleTimer = 0, bubbleKind = "";
+  function placeBubble() {
+    if (bubble.hidden) return;
+    const above = pos.y > 190;
+    const left = pos.x + size / 2 < innerWidth / 2;
+    bubble.classList.toggle("below", !above);
+    bubble.classList.toggle("right", !left);
+  }
+
+  async function speak(text, { acts = [], ms, kind = "tip" } = {}) {
+    if (!panel.hidden || bot.classList.contains("sleepy") || root.classList.contains("boot-on")) return false;
+    const id = ++speakId;
+    bubbleKind = kind;
+    clearTimeout(bubbleTimer);
+    bubbleText.textContent = "";
+    bubbleActs.textContent = "";
+    bubbleActs.hidden = true;
+    bubble.hidden = false;
+    placeBubble();
+    mood("happy", 900);
+
+    if (reduceMotion) {
+      bubbleText.textContent = text;
+    } else {
+      bot.classList.add("talking");
+      for (let i = 0; i < text.length; i++) {
+        if (id !== speakId) return false;
+        bubbleText.textContent += text[i];
+        bot.classList.toggle("mouth-open", i % 4 < 2 && /\S/.test(text[i]));
+        await sleep(/[.!?]/.test(text[i]) ? 140 : 22);
+      }
+      bot.classList.remove("talking", "mouth-open");
+    }
+    if (id !== speakId) return false;
+    acts.forEach(([label, fn]) => {
+      const b = el("button", "bot-act", label);
+      b.type = "button";
+      b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+      bubbleActs.appendChild(b);
+    });
+    bubbleActs.hidden = !acts.length;
+    placeBubble();
+    bubbleTimer = setTimeout(() => { if (id === speakId) hideBubble(); }, ms || 3500 + text.length * 40);
+    return true;
+  }
+
+  function hideBubble() {
+    speakId++;
+    clearTimeout(bubbleTimer);
+    bubble.hidden = true;
+    bot.classList.remove("talking", "mouth-open");
+    if (mode === "guide") endGuide();
+  }
+
+  bubble.addEventListener("click", (e) => {
+    if (e.target.closest(".bot-bubble-x")) {
+      // Closing a tour tip means "stop the tour" for this visit.
+      if (bubbleKind === "tour") session.set("tour-off", "1");
+      hideBubble();
+      return;
+    }
+    if (!e.target.closest(".bot-act")) setOpen(true);
+  });
+
+  // =====================================================================
+  //  TOUR GUIDE
+  // =====================================================================
+  const toolCount = P.stack.reduce((n, g) => n + g.items.length, 0);
+  const latest = P.experience[0];
+  const GUIDE = {
+    about: {
+      text: `This is /about. TL;DR: ${P.role.toLowerCase()} in ${P.location.split(",")[0]}, ${P.about.years_experience}+ years, into ${listJoin(P.about.focus)}.`,
+      acts: [["Tell me more", () => openAndAsk("Who is " + first + "?")]],
+    },
+    projects: {
+      text: `${P.projects.length} projects live here. Click "$ cat case-study.md" on a card to see the problem, results, and a live request trace! 🔍`,
+      acts: [["Summarize them", () => openAndAsk("What projects has " + first + " built?")]],
+    },
+    stack: {
+      text: `The toolbox: ${toolCount} tools in production. Curious about one? Ask me "do you know Docker?"`,
+      acts: [["Ask about a tool", () => setOpen(true)]],
+    },
+    github: {
+      text: "These stats are pulled live from GitHub's API. Real numbers, no copy-paste. 📡",
+      acts: [],
+    },
+    log: {
+      text: latest ? `Career history, written as a git log. Latest commit: ${latest.role} @ ${latest.org}.` : "Career history, written as a git log.",
+      acts: [["Full history", () => openAndAsk("Tell me about the work experience")]],
+    },
+    contact: {
+      text: P.about.open_to_work
+        ? `${first} is open to work! 🎉 Send a request with this form, or I can copy the email for you.`
+        : `Want to say hi? Send a request with this form, or I can copy the email for you.`,
+      acts: [["Copy email", () => actions.email(true)]],
+    },
+  };
+  const sections = Object.keys(GUIDE).map((id) => document.getElementById(id)).filter(Boolean);
+
+  // Where Bit hovers while presenting a section: in the left gutter beside the heading if there's room.
+  function guideSpot(section) {
+    const head = section.querySelector(".endpoint") || section;
+    return () => {
+      const r = head.getBoundingClientRect();
+      if (r.bottom < 60 || r.top > innerHeight) return null;
+      const sr = section.getBoundingClientRect();
+      const padL = parseFloat(getComputedStyle(section).paddingLeft) || 0;
+      const contentLeft = sr.left + padL;
+      lookAt = { x: r.left + 120, y: r.top + r.height / 2 };
+      if (contentLeft >= size + 28) return { x: contentLeft - size - 18, y: r.top + r.height / 2 - size / 2 };
+      return null; // narrow screen: stay put and talk from where we are
+    };
+  }
+
+  let guiding = null;
+  async function guide(section) {
+    if (guiding === section.id) return;
+    const g = GUIDE[section.id];
+    guiding = section.id;
+    session.set("seen:" + section.id, "1");
+    mode = "guide";
+    guideTarget = guideSpot(section);
+    kick();
+    await sleep(reduceMotion ? 0 : 450); // let it fly there first
+    if (guiding !== section.id) return;
+    hop("wave");
+    const ok = await speak(g.text, { kind: "tour", acts: g.acts.map(([l, fn]) => [l, () => { hideBubble(); fn(); }]) });
+    if (!ok && guiding === section.id) endGuide();
+  }
+  function endGuide() {
+    guiding = null;
+    guideTarget = null;
+    lookAt = null;
+    mode = followOn() ? "follow" : "home";
+    kick();
+  }
+
+  // Pick the section whose heading sits in the upper part of the screen once scrolling settles.
+  let settleTimer = 0, lastY = scrollY, lastT = performance.now();
+  addEventListener("scroll", () => {
+    const now = performance.now();
+    const v = Math.abs(scrollY - lastY) / Math.max(1, now - lastT) * 1000;
+    lastY = scrollY; lastT = now;
+    activity();
+    if (v > 4000 && !bot.classList.contains("mood-surprised")) mood("surprised", 700);
+    if (guiding) {
+      const s = document.getElementById(guiding);
+      const r = s && s.getBoundingClientRect();
+      if (!r || r.bottom < innerHeight * 0.25 || r.top > innerHeight * 0.75) hideBubble();
+    }
+    kick();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(pickSection, 380);
+  }, { passive: true });
+
+  function pickSection() {
+    if (!tourOn() || !panel.hidden || !greeted || root.classList.contains("boot-on")) return;
+    const s = sections.find((sec) => {
+      const r = sec.getBoundingClientRect();
+      return r.top < innerHeight * 0.55 && r.bottom > innerHeight * 0.45;
+    });
+    if (!s || session.get("seen:" + s.id) || guiding === s.id) return;
+    guide(s);
+  }
+
+  // =====================================================================
+  //  CHAT
+  // =====================================================================
   const SECTIONS = ["about", "projects", "stack", "github", "log", "contact"];
   const SECTION_LABEL = { about: "/about", projects: "/projects", stack: "/stack", github: "/github", log: "/log", contact: "/contact" };
 
@@ -98,6 +451,7 @@
     go(id) {
       const t = document.getElementById(id);
       if (!t) return;
+      session.set("seen:" + id, "1"); // they asked to go there; no need to narrate
       if (matchMedia("(max-width: 600px)").matches) setOpen(false);
       t.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
       t.classList.remove("bot-flash"); void t.offsetWidth; t.classList.add("bot-flash");
@@ -106,9 +460,12 @@
       if (!P.contact.resume) return;
       const a = el("a"); a.href = P.contact.resume; a.download = ""; document.body.appendChild(a); a.click(); a.remove();
     },
-    async email() {
-      try { await navigator.clipboard.writeText(P.contact.email); say("Copied " + P.contact.email + " to your clipboard. 📋"); }
-      catch (e) { say("Here it is: " + P.contact.email); }
+    async email(viaBubble) {
+      let ok = true;
+      try { await navigator.clipboard.writeText(P.contact.email); } catch (e) { ok = false; }
+      const msg = ok ? "Copied " + P.contact.email + " to your clipboard. 📋" : "Here it is: " + P.contact.email;
+      if (viaBubble && panel.hidden) { mood("happy"); hop(); speak(msg, { kind: "info", ms: 4000 }); }
+      else say(msg);
     },
   };
   const ACTION_LABEL = { resume: "⬇ Download resume", email: "Copy email" };
@@ -127,7 +484,6 @@
     return row.childNodes.length ? row : null;
   }
 
-  // ---------- chat log ----------
   const history = []; // [{role, content}] for the AI endpoint
 
   function addMsg(who, text, acts) {
@@ -152,13 +508,13 @@
     t.setAttribute("aria-label", BOT + " is typing");
     log.appendChild(t);
     log.scrollTop = log.scrollHeight;
-    fab.classList.add("thinking");
-    return () => { t.remove(); fab.classList.remove("thinking"); };
+    bot.classList.add("thinking");
+    return () => { t.remove(); bot.classList.remove("thinking"); };
   }
-  const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : ms));
+  const wait = (ms) => sleep(reduceMotion ? 0 : ms);
 
   // ---------- local knowledge ----------
-  const techIndex = new Map(); // lowercase tech -> where it's used
+  const techIndex = new Map();
   P.stack.forEach((g) => g.items.forEach(([name, note]) => {
     name.split("/").map((s) => s.trim()).forEach((n) => techIndex.set(n.toLowerCase(), { name: n, note, group: g.group }));
   }));
@@ -174,7 +530,7 @@
     const hits = [];
     techIndex.forEach((v, k) => {
       const key = k.replace(/[.+#]/g, (c) => "\\" + c);
-      if (new RegExp("(^|\\s)" + key + "(\\s|$|js)").test(q.trim())) hits.push(v);
+      if (new RegExp("(^|\\s)" + key + "(\\s|$|js)").test(q.trim()) && !hits.includes(v)) hits.push(v);
     });
     if (!hits.length) return null;
     const lines = hits.slice(0, 4).map((h) => {
@@ -222,7 +578,7 @@
     { id: "bot", kw: ["you", "your name", "are you", "bot", "robot", "ai"],
       a: () => ({ text: `I'm ${BOT}, ${first}'s pocket-sized robot assistant. 🤖 ${ENDPOINT ? "I run on Claude and only know about " + first + "." : "I know everything on this page."}` }) },
     { id: "thanks", kw: ["thanks", "thank you", "thx", "cool", "nice", "awesome", "great", "bye", "goodbye"],
-      a: () => ({ text: "Anytime! Beep boop. 🤖 I'll be right here in the corner." }) },
+      a: () => ({ text: "Anytime! Beep boop. 🤖 I'll be right here." }) },
   ];
 
   function localAnswer(raw) {
@@ -233,15 +589,14 @@
     INTENTS.forEach((it) => {
       let s = 0;
       it.kw.forEach((k) => { if (q.includes(" " + k + " ") || (k.length > 4 && q.includes(" " + k))) s += k.includes(" ") ? 2 : 1; });
-      if (it.id === "bot" || it.id === "greet") s *= 0.5; // weak signals; let topical intents win ties
+      if (it.id === "bot" || it.id === "greet") s *= 0.5;
       if (s > score) { score = s; best = it; }
     });
     if (!best || best.id === "stack" || best.id === "bot") {
       const t = techAnswer(q);
       if (t) return t;
     }
-    if (best) return best.a();
-    return null;
+    return best ? best.a() : null;
   }
 
   const FALLBACK = () => ({
@@ -275,7 +630,6 @@
     }
   }
 
-  // ---------- conversation ----------
   let busy = false;
   async function ask(raw) {
     const q = raw.trim().slice(0, 500);
@@ -301,7 +655,7 @@
     ["👋 Who is " + first + "?", "Who is " + first + "?"],
     ["Projects", "What projects has " + first + " built?"],
     ["Tech stack", "What is the tech stack?"],
-    ["Experience", "Tell me about the experience"],
+    ["Experience", "Tell me about the work experience"],
     ["Open to work?", "Is " + first + " open to work?"],
     ["Resume", "Can I get the resume?"],
   ];
@@ -320,15 +674,20 @@
   });
 
   // ---------- open / close ----------
-  let greeted = false;
+  let chatGreeted = false;
   function setOpen(open) {
-    panel.hidden = !open;
-    fab.setAttribute("aria-expanded", String(open));
-    wrap.classList.toggle("open", open);
     if (open) {
       hideBubble();
-      if (!greeted) {
-        greeted = true;
+      if (guiding) endGuide();
+    }
+    panel.hidden = !open;
+    fab.setAttribute("aria-expanded", String(open));
+    bot.classList.toggle("open", open);
+    kick(); // fly home next to the panel (or back to following)
+    if (open) {
+      bot.classList.remove("sleepy");
+      if (!chatGreeted) {
+        chatGreeted = true;
         say(`Hi! I'm ${BOT}, ${first}'s robot assistant. 🤖\nAsk me anything about ${first}, or tap a suggestion below.`);
       }
       if (!matchMedia("(pointer: coarse)").matches) input.focus();
@@ -336,75 +695,58 @@
       fab.focus({ preventScroll: true });
     }
   }
+  function openAndAsk(q) { setOpen(true); ask(q); }
+
   fab.addEventListener("click", () => setOpen(panel.hidden));
   panel.querySelector(".bot-close").addEventListener("click", () => setOpen(false));
   panel.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } });
 
-  // ---------- speech bubble ----------
-  let bubbleTimer = 0, lastBubble = 0;
-  const muted = () => store.get("muted") === "1";
-  function showBubble(text, ms = 7000) {
-    if (!panel.hidden || muted() || root.classList.contains("boot-on")) return;
-    bubbleText.textContent = text;
-    bubble.hidden = false;
-    lastBubble = Date.now();
-    fab.classList.add("wave");
-    setTimeout(() => fab.classList.remove("wave"), 1200);
-    clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(() => hideBubble(), ms);
+  // follow / tour toggles
+  const toggles = panel.querySelectorAll(".bot-toggle");
+  function syncToggles() {
+    toggles.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pref === "follow" ? followOn() : tourOn())));
   }
-  function hideBubble() { bubble.hidden = true; clearTimeout(bubbleTimer); }
-  bubble.addEventListener("click", (e) => {
-    if (e.target.closest(".bot-bubble-x")) { store.set("muted", "1"); hideBubble(); return; }
-    setOpen(true);
-  });
+  toggles.forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.pref === "follow") {
+      prefs.set("follow", !followOn());
+      if (!guiding) mode = followOn() ? "follow" : "home";
+    } else {
+      const on = !tourOn();
+      prefs.set("tour", on);
+      session.set("tour-off", on ? "0" : "1");
+    }
+    syncToggles();
+    kick();
+  }));
+  syncToggles();
 
-  // greeting once per session, after the boot intro
+  // =====================================================================
+  //  ENTRANCE
+  // =====================================================================
+  let greeted = false;
   function waitBoot(cb) {
     if (!root.classList.contains("boot-on")) return cb();
     const mo = new MutationObserver(() => { if (!root.classList.contains("boot-on")) { mo.disconnect(); cb(); } });
     mo.observe(root, { attributes: true, attributeFilter: ["class"] });
   }
-  waitBoot(() => {
-    setTimeout(() => {
-      if (store.get("greeted")) return;
-      store.set("greeted", "1");
-      showBubble(`Hi! I'm ${BOT} 👋 Got questions about ${first}? Ask me!`, 9000);
-    }, 4500);
+  waitBoot(async () => {
+    await sleep(900);
+    mode = followOn() ? "follow" : "home";
+    if (reduceMotion) { const h = home(); pos.x = h.x; pos.y = h.y; }
+    kick();
+    activity();
+    await sleep(reduceMotion ? 0 : 900);
+    hop("wave");
+    if (!session.get("greeted")) {
+      session.set("greeted", "1");
+      await speak(
+        tourOn()
+          ? `Hi! I'm ${BOT} 👋 I'll be your guide. Scroll down and I'll explain each section, or click me to chat!`
+          : `Hi! I'm ${BOT} 👋 Got questions about ${first}? Click me!`,
+        { kind: "greet", ms: 7000 },
+      );
+    }
+    greeted = true;
+    setTimeout(pickSection, 7500); // in case the page was opened mid-scroll
   });
-
-  // react (lightly) when visitors reach key sections
-  const REACT = {
-    projects: "Ooh, the good stuff. 👀 Ask me about any project!",
-    stack: "Wondering if " + first + " knows a tool? Just ask me.",
-    contact: P.about.open_to_work ? first + " is open to work. Want the email? 📬" : "Want " + first + "'s email? I can copy it.",
-  };
-  if ("IntersectionObserver" in window) {
-    const seen = new Set();
-    const io = new IntersectionObserver((entries) => entries.forEach((en) => {
-      const id = en.target.id;
-      if (!en.isIntersecting || seen.has(id) || !store.get("greeted")) return;
-      seen.add(id);
-      if (store.get("react:" + id) || Date.now() - lastBubble < 20000) return;
-      store.set("react:" + id, "1");
-      showBubble(REACT[id], 6000);
-    }), { threshold: 0.35 });
-    Object.keys(REACT).forEach((id) => { const s = document.getElementById(id); if (s) io.observe(s); });
-  }
-
-  // ---------- eyes follow the cursor, blink ----------
-  const eyes = wrap.querySelectorAll(".bot-fab .bot-eyes, .bot-mini .bot-eyes");
-  if (!reduceMotion) {
-    let tx = 0, ty = 0, raf = 0;
-    addEventListener("pointermove", (e) => {
-      const r = fab.getBoundingClientRect();
-      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300);
-      tx = (dx / d) * 3.2 * k; ty = (dy / d) * 2.4 * k;
-      if (!raf) raf = requestAnimationFrame(() => { raf = 0; eyes.forEach((g) => g.setAttribute("transform", `translate(${tx.toFixed(2)} ${ty.toFixed(2)})`)); });
-    }, { passive: true });
-    (function blink() {
-      setTimeout(() => { wrap.classList.add("blink"); setTimeout(() => { wrap.classList.remove("blink"); blink(); }, 140); }, 2500 + Math.random() * 4000);
-    })();
-  }
 })();

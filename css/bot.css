@@ -1,67 +1,130 @@
-/* Bit: portfolio assistant robot (bottom-left; the log stream owns bottom-right) */
-.bot { position: fixed; left: 16px; bottom: 16px; z-index: 50; font: 13px/1.55 var(--mono); }
-.boot-on .bot { display: none; }
+/* Bit: portfolio assistant robot. JS positions .bot with transform; it roams, follows the cursor and guides sections. */
+.bot { position: fixed; left: 0; top: 0; z-index: 50; font: 13px/1.55 var(--mono); will-change: transform; }
+.boot-on .bot, .boot-on .bot-panel { display: none; }
 
-/* robot drawing */
+/* ---------- drawing ---------- */
 .bot svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.bot-head { fill: var(--surface-2); stroke: var(--cyan); stroke-width: 2; }
-.bot-visor { fill: var(--term); stroke: var(--line-2); stroke-width: 1; }
-.bot-eye { fill: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); transform-box: fill-box; transform-origin: center; transition: transform .08s; }
-.bot-ear, .bot-body { fill: var(--surface); stroke: var(--line-2); stroke-width: 1.5; }
-.bot-stroke { stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; fill: none; }
-.bot-mouth { stroke: var(--magenta); }
-.bot-antenna { fill: var(--magenta); filter: drop-shadow(0 0 4px var(--magenta)); }
-.bot.blink .bot-eye { transform: scaleY(.12); }
-.bot-eyes { transition: transform .12s ease-out; }
+.b-skull { fill: var(--surface-2); stroke: var(--cyan); stroke-width: 2; }
+.b-visor { fill: var(--term); stroke: var(--line-2); stroke-width: 1; }
+.b-eye { fill: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); transform-box: fill-box; transform-origin: center; transition: transform .1s; }
+.b-eye-happy { fill: none; stroke: var(--cyan); stroke-width: 2.4; stroke-linecap: round; opacity: 0; filter: drop-shadow(0 0 3px var(--cyan)); }
+.b-eyes { transition: transform .12s ease-out; }
+.b-ear, .b-body { fill: var(--surface); stroke: var(--line-2); stroke-width: 1.5; }
+.b-stroke { stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; fill: none; }
+.b-mouth-smile { stroke: var(--magenta); transition: d .2s; }
+.b-mouth-o { fill: var(--magenta); opacity: 0; }
+.b-antenna { fill: var(--magenta); filter: drop-shadow(0 0 4px var(--magenta)); }
+.b-arm { stroke: var(--cyan); stroke-width: 3; stroke-linecap: round; fill: none; transform-box: view-box; transition: transform .25s; }
+.b-arm-l { transform-origin: 23px 53px; }
+.b-arm-r { transform-origin: 41px 53px; }
+.b-rig { transform-box: view-box; transform-origin: 32px 40px; transform: rotate(var(--tilt, 0deg)); }
+.b-head { transform-box: view-box; transform-origin: 32px 48px; }
+.b-flame { opacity: 0; transform-box: view-box; transform-origin: 32px 59px; transform: rotate(calc(var(--tilt, 0deg) * -1)) scaleY(.4); transition: opacity .2s; }
+.b-flame-out { fill: var(--magenta); filter: drop-shadow(0 0 4px var(--magenta)); }
+.b-flame-in { fill: var(--yellow); }
+.b-zzz { opacity: 0; fill: var(--cyan); font: 700 9px var(--mono); }
 
-/* floating button */
+/* idle life: breathing head, glowing antenna */
+.bot .b-head { animation: botBreathe 3.2s ease-in-out infinite; }
+.bot .b-antenna { animation: botGlow 2.4s ease-in-out infinite alternate; }
+@keyframes botBreathe { 50% { transform: translateY(-1.2px) scale(1.015); } }
+@keyframes botGlow { to { filter: drop-shadow(0 0 8px var(--magenta)); } }
+
+/* moods */
+.bot.blink .b-eye { transform: scaleY(.1); }
+.bot.mood-happy .b-eye { opacity: 0; }
+.bot.mood-happy .b-eye-happy { opacity: 1; }
+.bot.mood-happy .b-mouth-smile { d: path("M26 43 q6 5 12 0"); }
+.bot.mood-surprised .b-eye { transform: scale(1.25); }
+.bot.mood-surprised .b-mouth-smile, .bot.mouth-open .b-mouth-smile { opacity: 0; }
+.bot.mood-surprised .b-mouth-o, .bot.mouth-open .b-mouth-o { opacity: 1; }
+.bot.talking .b-head { animation: botTalk .28s ease-in-out infinite alternate; }
+@keyframes botTalk { to { transform: rotate(2.5deg); } }
+.bot.thinking .b-antenna { animation: botPulse .6s ease-in-out infinite alternate; }
+@keyframes botPulse { to { fill: var(--yellow); filter: drop-shadow(0 0 8px var(--yellow)); } }
+
+/* flying: jet flame + arms swept back */
+.bot.flying .b-flame { opacity: 1; animation: botFlicker .09s steps(2) infinite; }
+.bot.flying .b-arm-l { transform: rotate(-25deg); }
+.bot.flying .b-arm-r { transform: rotate(25deg); }
+@keyframes botFlicker {
+  0% { transform: rotate(calc(var(--tilt, 0deg) * -1)) scaleY(1); }
+  50% { transform: rotate(calc(var(--tilt, 0deg) * -1)) scaleY(.7); }
+}
+
+/* sleeping */
+.bot.sleepy .b-eye { transform: scaleY(.12); }
+.bot.sleepy .b-head { animation: botNod 3.5s ease-in-out infinite; }
+.bot.sleepy .b-antenna { animation: none; fill: var(--dim); filter: none; }
+.bot.sleepy .b-zzz { opacity: 1; }
+.bot.sleepy .b-zzz text { animation: botZ 2.4s ease-in infinite; }
+.bot.sleepy .b-zzz text:nth-child(2) { animation-delay: 1.2s; }
+@keyframes botNod { 50% { transform: rotate(-6deg) translateY(1.5px); } }
+@keyframes botZ { 0% { opacity: 0; transform: translate(0, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -8px); } }
+
+/* ---------- button ---------- */
 .bot-fab {
   all: unset; box-sizing: border-box; display: block; width: 64px; height: 64px; padding: 6px; cursor: pointer;
-  border-radius: 18px; background: rgba(7, 7, 13, .85); border: 1px solid var(--line-2);
+  border-radius: 18px; background: rgba(7, 7, 13, .78); border: 1px solid var(--line-2);
   box-shadow: 0 8px 30px rgba(0, 0, 0, .5), 0 0 22px rgba(0, 240, 255, .15);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  animation: botFloat 4s ease-in-out infinite; transition: border-color .2s, box-shadow .2s;
+  animation: botFloat 4s ease-in-out infinite; transition: border-color .2s, box-shadow .2s, background .2s;
 }
 .bot-fab:hover { border-color: var(--cyan); box-shadow: 0 8px 30px rgba(0, 0, 0, .5), 0 0 28px rgba(0, 240, 255, .35); }
 .bot-fab:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-.bot.open .bot-fab { animation: none; border-color: var(--cyan); }
-.bot-fab.wave svg { animation: botWave 1.2s ease-in-out; transform-origin: 50% 90%; }
-.bot-fab.thinking .bot-antenna { animation: botPulse .7s ease-in-out infinite alternate; }
+.bot.open .bot-fab { border-color: var(--cyan); }
+.bot.flying .bot-fab { animation: none; background: rgba(7, 7, 13, .55); }
+.bot-fab.hop, .bot-fab.wave { animation: botHop .6s cubic-bezier(.3, 1.6, .5, 1); }
+.bot-fab.wave .b-arm-r { animation: botWave .9s ease-in-out; }
 @keyframes botFloat { 50% { transform: translateY(-5px); } }
-@keyframes botWave { 20%, 60% { transform: rotate(-10deg); } 40%, 80% { transform: rotate(10deg); } }
-@keyframes botPulse { to { fill: var(--yellow); filter: drop-shadow(0 0 7px var(--yellow)); } }
+@keyframes botHop { 40% { transform: translateY(-12px) scale(1.04, .96); } 70% { transform: translateY(0) scale(.97, 1.03); } }
+@keyframes botWave { 20%, 60% { transform: rotate(-120deg); } 40%, 80% { transform: rotate(-80deg); } }
 
-/* speech bubble */
+/* ---------- speech bubble (flips above/below, left/right to stay on screen) ---------- */
 .bot-bubble {
-  position: absolute; left: 0; bottom: 76px; width: max-content; max-width: min(280px, calc(100vw - 32px));
+  position: absolute; left: 0; bottom: calc(100% + 14px); width: max-content; max-width: min(290px, calc(100vw - 32px));
   padding: 10px 30px 10px 12px; color: var(--text); cursor: pointer;
   background: var(--term); border: 1px solid rgba(0, 240, 255, .45); border-radius: 12px 12px 12px 4px;
-  box-shadow: 0 0 22px rgba(0, 240, 255, .18); animation: botPop .3s ease-out;
+  box-shadow: 0 0 22px rgba(0, 240, 255, .18), 0 10px 30px rgba(0, 0, 0, .5); animation: botPop .3s ease-out;
 }
 .bot-bubble[hidden] { display: none; }
+.bot-bubble.right { left: auto; right: 0; border-radius: 12px 12px 4px 12px; }
+.bot-bubble.below { bottom: auto; top: calc(100% + 14px); border-radius: 4px 12px 12px 12px; }
+.bot-bubble.below.right { border-radius: 12px 4px 12px 12px; }
 .bot-bubble::after {
   content: ""; position: absolute; left: 22px; bottom: -7px; width: 12px; height: 12px; transform: rotate(45deg);
   background: var(--term); border-right: 1px solid rgba(0, 240, 255, .45); border-bottom: 1px solid rgba(0, 240, 255, .45);
 }
+.bot-bubble.right::after { left: auto; right: 22px; }
+.bot-bubble.below::after { bottom: auto; top: -7px; transform: rotate(225deg); }
+.bot-bubble-text { margin: 0; min-height: 1.55em; }
+.bot-bubble .bot-actions[hidden] { display: none; }
 .bot-bubble-x { all: unset; position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; text-align: center; line-height: 22px; color: var(--dim); cursor: pointer; border-radius: 6px; }
 .bot-bubble-x:hover { color: var(--white); background: var(--surface-2); }
 .bot-bubble-x:focus-visible { outline: 2px solid var(--cyan); }
 @keyframes botPop { from { opacity: 0; transform: translateY(8px) scale(.96); } }
 
-/* chat panel */
+/* ---------- chat panel (anchored bottom-left; Bit flies home beside it) ---------- */
 .bot-panel {
-  position: absolute; left: 0; bottom: 76px; width: 360px; max-width: calc(100vw - 32px);
-  height: min(520px, calc(100vh - 120px)); height: min(520px, calc(100dvh - 120px));
-  display: flex; flex-direction: column; overflow: hidden;
+  position: fixed; left: 16px; bottom: 92px; z-index: 50; width: 380px; max-width: calc(100vw - 32px);
+  height: min(520px, calc(100vh - 170px)); height: min(520px, calc(100dvh - 170px));
+  display: flex; flex-direction: column; overflow: hidden; font: 13px/1.55 var(--mono);
   background: rgba(7, 7, 13, .96); border: 1px solid var(--line-2); border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .6), 0 0 30px rgba(0, 240, 255, .12);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   animation: botPop .22s ease-out; transform-origin: bottom left;
 }
 .bot-panel[hidden] { display: none; }
-.bot-panel-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--white); }
+.bot-panel-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--white); }
 .bot-mini { width: 28px; height: 28px; flex: none; }
-.bot-close { all: unset; margin-left: auto; width: 28px; height: 28px; text-align: center; line-height: 28px; font-size: 18px; color: var(--muted); cursor: pointer; border-radius: 8px; }
+.bot-mini svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.bot-title { white-space: nowrap; }
+.bot-toggles { display: flex; gap: 4px; margin-left: auto; }
+.bot-toggle { all: unset; cursor: pointer; padding: 2px 7px; border-radius: 999px; font-size: 11px; color: var(--dim); border: 1px solid var(--line-2); white-space: nowrap; }
+.bot-toggle[aria-pressed="true"] { color: var(--cyan); border-color: rgba(0, 240, 255, .5); background: rgba(0, 240, 255, .08); }
+.bot-toggle:hover { color: var(--white); }
+.bot-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.bot-close { all: unset; width: 28px; height: 28px; flex: none; text-align: center; line-height: 28px; font-size: 18px; color: var(--muted); cursor: pointer; border-radius: 8px; }
 .bot-close:hover { color: var(--white); background: var(--surface-2); }
 .bot-close:focus-visible { outline: 2px solid var(--cyan); }
 
@@ -71,8 +134,8 @@
 .bot-text { padding: 8px 11px; border-radius: 12px; overflow-wrap: anywhere; }
 .bot-msg.from-bot .bot-text { background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 4px; color: var(--text); }
 .bot-msg.from-user .bot-text { background: rgba(0, 240, 255, .1); border: 1px solid rgba(0, 240, 255, .35); border-top-right-radius: 4px; color: var(--white); }
-.bot-text a { color: var(--cyan); }
-.bot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bot-text a, .bot-bubble a { color: var(--cyan); }
+.bot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .bot-act, .bot-chip {
   all: unset; box-sizing: border-box; cursor: pointer; padding: 4px 10px; border-radius: 999px; font: 12px/1.5 var(--mono);
   color: var(--cyan); border: 1px solid rgba(0, 240, 255, .35); background: rgba(0, 240, 255, .05); transition: background .15s, color .15s;
@@ -103,14 +166,14 @@
 @keyframes botFlash { 0%, 40% { box-shadow: 0 0 0 2px rgba(0, 240, 255, .55), 0 0 40px rgba(0, 240, 255, .2); } 100% { box-shadow: 0 0 0 2px transparent; } }
 
 @media (max-width: 600px) {
-  .bot { left: 12px; bottom: 12px; }
-  .bot-fab { width: 56px; height: 56px; }
-  .bot-panel { position: fixed; left: 12px; right: 12px; bottom: 80px; width: auto; max-width: none; height: min(560px, calc(100dvh - 100px)); }
-  .bot-bubble { bottom: 68px; }
+  .bot-fab { width: 56px; height: 56px; padding: 5px; }
+  .bot-panel { left: 12px; right: 12px; bottom: 80px; width: auto; max-width: none; height: min(560px, calc(100dvh - 100px)); }
   .bot-form input { font-size: 16px; } /* no iOS zoom on focus */
+  .bot-toggle { padding: 2px 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bot-fab, .bot-fab.wave svg, .bot-panel, .bot-bubble, .bot-msg, .bot-flash { animation: none; }
+  .bot .b-head, .bot .b-antenna, .bot-fab, .bot-fab.hop, .bot-fab.wave, .bot-fab .b-arm-r,
+  .bot-panel, .bot-bubble, .bot-msg, .bot-flash, .bot.sleepy .b-zzz text { animation: none; }
   .bot-msg.typing i { animation: none; opacity: .7; }
 }
